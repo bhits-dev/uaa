@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorator="layouts/main">
 <div class="island" layout:fragment="page-content">
-    <h1 th:text="${T(org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder).uaa ? 'Welcome!':'Welcome to '+zone_name+'!'}">Welcome!</h1>
+    <h1 th:text="${T(org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder).uaa ? 'Welcome!':'Welcome to '+zone_name+'!'}"><strong>Welcome!</strong></h1>
     <div class="island-content">
         <th:block th:if="${fieldUsernameShow}">
         <form th:action="@{/login.do}" method="post" novalidate="novalidate">
@@ -15,7 +15,7 @@
                    th:autocomplete="${prompt.value[0] != 'password'}"
                    th:autofocus="${iter.index} == 0"
                    class="form-control"/>
-            <input type="submit" value="Sign in" class="island-button"/>
+            <input type="submit" value="Sign in" class="island-button dark-green"/>
         </form>
         </th:block>
         <div class="saml-login">

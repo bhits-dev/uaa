@@ -17,11 +17,13 @@
     <meta name='keywords' content=""/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <link href="/vendor/font-awesome/css/font-awesome.min.css" th:href="@{/vendor/font-awesome/css/font-awesome.min.css}" rel="stylesheet"/>
+
     <link href="/resources/pivotal/stylesheets/application.css" th:href="@{${assetBaseUrl}+'/stylesheets/application.css'}" rel="stylesheet"/>
+    <link href="/resources/pivotal/stylesheets/main.css" th:href="@{${assetBaseUrl}+'/stylesheets/main.css'}" rel="stylesheet"/>
 </head>
 <body>
 <div class="content">
-    <div class="header" th:style="${isUaa} ? |background-image: url(@{${assetBaseUrl}+'/images/logo.png'});|" layout:fragment="page-header"></div>
+    <div class="header" th:style="${isUaa} ? |background-image: url(@{${assetBaseUrl}+'/images/mhc_white.png'});|" layout:fragment="page-header"></div>
     <div layout:fragment="page-content"></div>
     <div class="footer-spacer"></div>
 </div>
