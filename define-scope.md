@@ -8,3 +8,12 @@
 - If the token "audience" field doesn't contain the resource id , the resource server will deny access to a resource.
 
 
+# Scope Naming Convention
+
+-Scope in UAA should be defined as resourceId.resourceName_permission
+
+-resourceId and resourceName should always be separated by a period '.'
+
+-resourceName and permission should be separated by a underscore '_'
+
+-All words resourceId, resourceName and permission should follow a Camel Casing
