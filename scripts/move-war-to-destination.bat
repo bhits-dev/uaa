@@ -16,12 +16,17 @@ SET destination=%CONFIGS_DELIVERY_HOME%\%jobName%
 :: Declare variables end
 
 :: Start running script
+CALL :removeOldArtifact
 CALL :copyWarToDestination
 CALL :renameWarFile
 
 EXIT %ERRORLEVEL%
 
 :: Declare methods start
+:removeOldArtifact
+  DEL /F /Q %destination%\*.war >NUL
+  GOTO :EOF
+  
 :copyWarToDestination
   ::SET specifiesTheFile=/COPYALL /B /SEC /MIR *.war
   SET specifiesTheFile=/MIR /XX *.war
