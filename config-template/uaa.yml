@@ -64,9 +64,8 @@ oauth:
       redirect-uri: http://localhost:8084/adminPortal/login
 scim:
   users:
-    - admin@test.com|admin|admin.portal@phradminportal.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.hie_write,registration.write,zones.uaa.admin
-    - bob@test.com|bob|bob@phr.com|Bob|Lastname|phr.hie_read,phr.hie_write,pcm.provider_read,pcm.provider_create,pcm.provider_delete,pcm.consent_read,pcm.consent_create,pcm.consent_update,pcm.consent_delete,pcm.consent_sign,pcm.consent_revoke,pcm.clinicalDocument_read,pcm.clinicalDocument_create,pcm.clinicalDocument_delete
-    - albert.smith@test.com|password|albert.smith@phr.com|Albert|Smith|phr.hie_read,phr.hie_write,pcm.provider_read,pcm.provider_create,pcm.provider_delete,pcm.consent_read,pcm.consent_create,pcm.consent_update,pcm.consent_delete,pcm.consent_sign,pcm.consent_revoke,pcm.clinicalDocument_read,pcm.clinicalDocument_create,pcm.clinicalDocument_delete
+    - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.hie_write,registration.write,zones.uaa.admin
+    - consent2share@outlook.com|bob|consent2share@outlook.com|Bob|Lastname|phr.hie_read,phr.hie_write,pcm.provider_read,pcm.provider_create,pcm.provider_delete,pcm.consent_read,pcm.consent_create,pcm.consent_update,pcm.consent_delete,pcm.consent_sign,pcm.consent_revoke,pcm.clinicalDocument_read,pcm.clinicalDocument_create,pcm.clinicalDocument_delete
 jwt:
   token:
     verification-key: |
