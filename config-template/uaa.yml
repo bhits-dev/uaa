@@ -10,8 +10,6 @@ smtp:
         starttls:
           enable: true
       debug: true
-login:
-  brand: MHC
 spring_profiles: mysql # default is empty
 database:
   driverClassName: org.mariadb.jdbc.Driver # only if spring_profiles=mysql
