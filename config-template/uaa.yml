@@ -9,6 +9,8 @@ smtp:
         auth: true
         starttls:
           enable: true
+        ssl:
+          trust: smtp.gmail.com
       debug: true
 spring_profiles: mysql # default is empty
 database:

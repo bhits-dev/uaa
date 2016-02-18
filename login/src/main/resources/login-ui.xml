@@ -510,6 +510,7 @@
                 <prop key="mail.smtp.auth">${smtp.javaMailProperties.mail.smtp.auth}</prop>
                 <prop key="mail.smtp.starttls.enable">${smtp.javaMailProperties.mail.smtp.starttls.enable}</prop>
                 <prop key="mail.debug">${smtp.javaMailProperties.mail.debug}</prop>
+                <prop key="mail.smtp.ssl.trust">${smtp.javaMailProperties.mail.smtp.ssl.trust}</prop>
             </props>
         </property>
     </bean>
