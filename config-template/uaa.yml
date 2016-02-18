@@ -1,17 +1,47 @@
+smtp:
+  host: smtp.gmail.com
+  port: 587
+  user: consent2share@gmail.com
+  password: fei@columbia
+  javaMailProperties:
+    mail:
+      smtp:
+        auth: true
+        starttls:
+          enable: true
+      debug: true
 spring_profiles: mysql # default is empty
 database:
   driverClassName: org.mariadb.jdbc.Driver # only if spring_profiles=mysql
-  url: jdbc:mysql://bhitsqadb02/uaa # only if spring_profiles=mysql
+  url: jdbc:mysql://localhost:3306/uaa # only if spring_profiles=mysql
   username: root # only if spring_profiles=mysql
   password: admin # only if spring_profiles=mysql
 oauth:
+  user:
+    authorities:
+      - openid
+      - phr.hie_read
+      - phr.hie_write
+      - pcm.provider_read
+      - pcm.provider_create
+      - pcm.provider_delete
+      - pcm.consent_read
+      - pcm.consent_create
+      - pcm.consent_update
+      - pcm.consent_delete
+      - pcm.consent_sign
+      - pcm.consent_revoke
+      - pcm.clinicalDocument_read
+      - pcm.clinicalDocument_create
+      - pcm.clinicalDocument_delete
+      - scim.me
+      - password.write
+      - scim.userids
+      - uaa.user
+      - approvals.me
+      - oauth.approvals
   clients:
-    patient-portal-ui:
-      authorized-grant-types: implicit
-      scope: openid,phr.hie.readDocument
-      authorities: uaa.resource
-      redirect-uri: http://localhost:8081/pp-ui/fe/login
-    admin: # super admin used to create users and register clients. Once this client is created, action should be taken immediately to change the secret
+    admin:
       secret: adminsecret
       authorized-grant-types: client_credentials
       scope: uaa.none
@@ -21,16 +51,22 @@ oauth:
       scope: uaa.user,cloud_controller.read,cloud_controller.write,openid,password.write,scim.userids,cloud_controller.admin,scim.read,scim.write
       authorities: uaa.none
       autoapprove: true
-# A comprehensive list of hostnames routed to the UAA default zone. The UAA uses this to resolve subdomains for Identity Zones.
-# Defaults to 'localhost'
-zones:
-  internal:
-    hostnames:
-      - bhitsqaapp02
-#      - host1.domain.com
-#      - host2
-#      - testzone3.localhost
-#      - testzone4.localhost
+    patient-portal-ui:
+      authorized-grant-types: implicit
+      scope: openid,phr.hie_read,phr.hie_write,pcm.provider_read,pcm.provider_create,pcm.provider_delete,pcm.consent_read,pcm.consent_create,pcm.consent_update,pcm.consent_delete,pcm.consent_sign,pcm.consent_revoke,pcm.clinicalDocument_read,pcm.clinicalDocument_create,pcm.clinicalDocument_delete
+      authorities: uaa.resource
+      redirect-uri: http://localhost:8081/pp-ui/fe/login
+    admin-portal:
+      secret: secret
+      authorized-grant-types: authorization_code
+      scope: openid,scim.write,scim.read,scim.create,phr.hie_write,registration.write,scim.read,zones.uaa.admin
+      authorities: uaa.resource
+      redirect-uri: http://localhost:8084/adminPortal/login
+scim:
+  users:
+    - admin@test.com|admin|admin.portal@phradminportal.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.hie_write,registration.write,zones.uaa.admin
+    - bob@test.com|bob|bob@phr.com|Bob|Lastname|phr.hie_read,phr.hie_write,pcm.provider_read,pcm.provider_create,pcm.provider_delete,pcm.consent_read,pcm.consent_create,pcm.consent_update,pcm.consent_delete,pcm.consent_sign,pcm.consent_revoke,pcm.clinicalDocument_read,pcm.clinicalDocument_create,pcm.clinicalDocument_delete
+    - albert.smith@test.com|password|albert.smith@phr.com|Albert|Smith|phr.hie_read,phr.hie_write,pcm.provider_read,pcm.provider_create,pcm.provider_delete,pcm.consent_read,pcm.consent_create,pcm.consent_update,pcm.consent_delete,pcm.consent_sign,pcm.consent_revoke,pcm.clinicalDocument_read,pcm.clinicalDocument_create,pcm.clinicalDocument_delete
 jwt:
   token:
     verification-key: |
