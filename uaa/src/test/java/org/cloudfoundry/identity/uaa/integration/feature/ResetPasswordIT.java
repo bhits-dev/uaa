@@ -1,6 +1,6 @@
 /*******************************************************************************
  *     Cloud Foundry
- *     Copyright (c) [2009-2014] Pivotal Software, Inc. All Rights Reserved.
+ *     Copyright (c) [2009-2016] Pivotal Software, Inc. All Rights Reserved.
  *
  *     This product is licensed to you under the Apache License, Version 2.0 (the "License").
  *     You may not use this product except in compliance with the License.
@@ -85,7 +85,7 @@ public class ResetPasswordIT {
     public void setUp() throws Exception {
         int randomInt = new SecureRandom().nextInt();
 
-        String adminAccessToken = testClient.getOAuthAccessToken("admin", "adminsecret", "client_credentials", "clients.read clients.write clients.secret");
+        String adminAccessToken = testClient.getOAuthAccessToken("admin", "adminsecret", "client_credentials", "clients.read clients.write clients.secret clients.admin");
         scimClientId = "scim" + randomInt;
         testClient.createScimClient(adminAccessToken, scimClientId);
         String scimAccessToken = testClient.getOAuthAccessToken(scimClientId, "scimsecret", "client_credentials", "scim.read scim.write password.write");
