@@ -54,10 +54,10 @@ oauth:
       authorities: uaa.none
       autoapprove: true
     patient-portal-ui:
-      authorized-grant-types: implicit
+      authorized-grant-types: password
+      secret: changeit
       scope: openid,phr.hie_read,phr.hie_write,pcm.provider_read,pcm.provider_create,pcm.provider_delete,pcm.consent_read,pcm.consent_create,pcm.consent_update,pcm.consent_delete,pcm.consent_sign,pcm.consent_revoke,pcm.clinicalDocument_read,pcm.clinicalDocument_create,pcm.clinicalDocument_delete
       authorities: uaa.resource
-      redirect-uri: https://localhost:8444/pp-ui/fe/login
     admin-portal:
       secret: secret
       authorized-grant-types: authorization_code
@@ -68,6 +68,43 @@ scim:
   users:
     - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.hie_write,registration.write,zones.uaa.admin
     - consent2share@outlook.com|bob|consent2share@outlook.com|Bob|Lastname|phr.hie_read,phr.hie_write,pcm.provider_read,pcm.provider_create,pcm.provider_delete,pcm.consent_read,pcm.consent_create,pcm.consent_update,pcm.consent_delete,pcm.consent_sign,pcm.consent_revoke,pcm.clinicalDocument_read,pcm.clinicalDocument_create,pcm.clinicalDocument_delete
+cors:
+  xhr:
+    allowed:
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+        - X-Requested-With
+      origin:
+        - ^.*$
+      uris:
+        - ^/uaa/userinfo$
+        - ^/uaa/logout\.do$
+        - ^/uaa/oauth/token$
+      methods:
+        - GET
+        - OPTIONS
+  default:
+    allowed:
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+        - X-Requested-With
+      origin:
+        - ^.*$
+      uris:
+        - ^.*$
+#      - ^/uaa/userinfo$
+#      - ^/uaa/login\.do$
+#      - ^/uaa/logout\.do$
+#      - ^/uaa/oauth/token$
+      methods:
+        - GET
+        - PUT
+        - POST
+        - DELETE
 jwt:
   token:
     verification-key: |
