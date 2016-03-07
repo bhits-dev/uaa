@@ -19,29 +19,6 @@ database:
   username: root # only if spring_profiles=mysql
   password: admin # only if spring_profiles=mysql
 oauth:
-  user:
-    authorities:
-      - openid
-      - phr.hie_read
-      - phr.hie_write
-      - pcm.provider_read
-      - pcm.provider_create
-      - pcm.provider_delete
-      - pcm.consent_read
-      - pcm.consent_create
-      - pcm.consent_update
-      - pcm.consent_delete
-      - pcm.consent_sign
-      - pcm.consent_revoke
-      - pcm.clinicalDocument_read
-      - pcm.clinicalDocument_create
-      - pcm.clinicalDocument_delete
-      - scim.me
-      - password.write
-      - scim.userids
-      - uaa.user
-      - approvals.me
-      - oauth.approvals
   clients:
     admin:
       secret: adminsecret
@@ -61,12 +38,28 @@ oauth:
     admin-portal:
       secret: secret
       authorized-grant-types: authorization_code
-      scope: openid,scim.write,scim.read,scim.create,phr.hie_write,registration.write,scim.read,zones.uaa.admin
+      scope: openid,scim.write,scim.read,scim.create,phr.hie_write,registration.write,uaa.admin
       authorities: uaa.resource
       redirect-uri: https://localhost:8447/adminPortal/login
 scim:
+  groups:
+    phr.hie_read: Access your health information
+    phr.hie_write: Add your health information
+    pcm.provider_read: Access provider from list
+    pcm.provider_create: Create new provider
+    pcm.provider_delete: Delete provider from list
+    pcm.consent_read: Access and display your consent
+    pcm.consent_create: Add new consent
+    pcm.consent_update: Update current consent
+    pcm.consent_delete: Delete a consent
+    pcm.consent_sign: Sign consent
+    pcm.consent_revoke: Revoke current consent
+    pcm.clinicalDocument_read: Access and display clinical document
+    pcm.clinicalDocument_create: Create new clinical document
+    pcm.clinicalDocument_delete: Delete current clinical document
+
   users:
-    - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.hie_write,registration.write,zones.uaa.admin
+    - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.hie_write,registration.write,uaa.admin
     - consent2share@outlook.com|bob|consent2share@outlook.com|Bob|Lastname|phr.hie_read,phr.hie_write,pcm.provider_read,pcm.provider_create,pcm.provider_delete,pcm.consent_read,pcm.consent_create,pcm.consent_update,pcm.consent_delete,pcm.consent_sign,pcm.consent_revoke,pcm.clinicalDocument_read,pcm.clinicalDocument_create,pcm.clinicalDocument_delete
 jwt:
   token:
