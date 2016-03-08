@@ -64,6 +64,11 @@ oauth:
       scope: openid,scim.write,scim.read,scim.create,phr.hie_write,registration.write,scim.read,zones.uaa.admin
       authorities: uaa.resource
       redirect-uri: https://localhost:8447/adminPortal/login
+    admin-portal-ui:
+      authorized-grant-types: implicit
+      scope: openid,scim.write,scim.read,scim.create,phr.hie_write,registration.write,scim.read,zones.uaa.admin
+      authorities: uaa.resource
+      redirect-uri: https://localhost:8451/admin-ui/fe/login  
 scim:
   users:
     - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.hie_write,registration.write,zones.uaa.admin
