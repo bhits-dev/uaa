@@ -68,47 +68,9 @@ scim:
     pcm.clinicalDocument_read: Access and display clinical document
     pcm.clinicalDocument_create: Create new clinical document
     pcm.clinicalDocument_delete: Delete current clinical document
-    
   users:
     - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.allPatientProfiles_read,phr.hie_write,phr.patient_read,registration.write,uaa.admin,patientUser.read,patientUser.write
     - consent2share@outlook.com|bob|consent2share@outlook.com|Bob|Lastname|phr.hie_read,phr.hie_write,pcm.provider_read,pcm.provider_create,pcm.provider_delete,pcm.consent_read,pcm.consent_create,pcm.consent_update,pcm.consent_delete,pcm.consent_sign,pcm.consent_revoke,pcm.clinicalDocument_read,pcm.clinicalDocument_create,pcm.clinicalDocument_delete
-cors:
-  xhr:
-    allowed:
-      headers:
-        - Accept
-        - Authorization
-        - Content-Type
-        - X-Requested-With
-      origin:
-        - ^.*$
-      uris:
-        - ^/uaa/userinfo$
-        - ^/uaa/logout\.do$
-        - ^/uaa/oauth/token$
-      methods:
-        - GET
-        - OPTIONS
-  default:
-    allowed:
-      headers:
-        - Accept
-        - Authorization
-        - Content-Type
-        - X-Requested-With
-      origin:
-        - ^.*$
-      uris:
-        - ^.*$
-#      - ^/uaa/userinfo$
-#      - ^/uaa/login\.do$
-#      - ^/uaa/logout\.do$
-#      - ^/uaa/oauth/token$
-      methods:
-        - GET
-        - PUT
-        - POST
-        - DELETE
 jwt:
   token:
     verification-key: |
