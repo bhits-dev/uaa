@@ -42,10 +42,10 @@ oauth:
       authorities: uaa.resource
       redirect-uri: https://localhost:8447/adminPortal/login
     admin-portal-ui:
-      authorized-grant-types: implicit
+      authorized-grant-types: password
+      secret: changeit
       scope: openid,scim.write,scim.read,scim.create,phr.allPatientProfiles_read,phr.hie_write,phr.patient_read,registration.write,uaa.admin,patientUser.read,patientUser.write
       authorities: uaa.resource
-      redirect-uri: https://localhost:8451/admin-ui/fe/login
     patient-user:
       secret: patient-user-secret
       authorized-grant-types: client_credentials
