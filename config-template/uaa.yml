@@ -50,7 +50,7 @@ oauth:
       secret: patient-user-secret
       authorized-grant-types: client_credentials
       scope: uaa.none
-      authorities: phr.allPatientProfiles_read,scim.write,scim.read,scim.create,uaa.admin
+      authorities: phr.patient_read,phr.allPatientProfiles_read,scim.write,scim.read,scim.create,uaa.admin
 scim:
   groups:
     phr.hie_read: Access your health information
