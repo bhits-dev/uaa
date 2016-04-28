@@ -35,12 +35,6 @@ oauth:
       secret: changeit
       scope: openid,phr.hie_read,phr.hie_write,phr.patient_read,pcm.provider_read,pcm.provider_create,pcm.provider_delete,pcm.consent_read,pcm.consent_create,pcm.consent_update,pcm.consent_delete,pcm.consent_sign,pcm.consent_revoke,pcm.clinicalDocument_read,pcm.clinicalDocument_create,pcm.clinicalDocument_delete
       authorities: uaa.resource
-    admin-portal:
-      secret: secret
-      authorized-grant-types: authorization_code
-      scope: openid,scim.write,scim.read,scim.create,phr.allPatientProfiles_read,phr.hie_write,registration.write,uaa.admin,patientUser.read,patientUser.write
-      authorities: uaa.resource
-      redirect-uri: https://localhost:8447/adminPortal/login
     admin-portal-ui:
       authorized-grant-types: password
       secret: changeit
@@ -70,7 +64,7 @@ scim:
     pcm.clinicalDocument_delete: Delete current clinical document
   users:
     - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.allPatientProfiles_read,phr.hie_write,phr.patient_read,registration.write,uaa.admin,patientUser.read,patientUser.write
-    - consent2share@outlook.com|bob|consent2share@outlook.com|Bob|Lastname|phr.hie_read,phr.hie_write,pcm.provider_read,pcm.provider_create,pcm.provider_delete,pcm.consent_read,pcm.consent_create,pcm.consent_update,pcm.consent_delete,pcm.consent_sign,pcm.consent_revoke,pcm.clinicalDocument_read,pcm.clinicalDocument_create,pcm.clinicalDocument_delete
+    - consent2share@outlook.com|bob|consent2share@outlook.com|Bob|Lastname|phr.hie_read,phr.hie_write,phr.patient_read,pcm.provider_read,pcm.provider_create,pcm.provider_delete,pcm.consent_read,pcm.consent_create,pcm.consent_update,pcm.consent_delete,pcm.consent_sign,pcm.consent_revoke,pcm.clinicalDocument_read,pcm.clinicalDocument_create,pcm.clinicalDocument_delete
 jwt:
   token:
     verification-key: |
