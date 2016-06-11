@@ -117,6 +117,7 @@ public class ResetPasswordController {
             userId = e.getUserId();
         } catch (NotFoundException e) {
             logger.error("User with email address " + email + " not found.");
+            throw new NotFoundException("Email address can not be found.");
         }
 
         if (htmlContent != null && userId != null) {
