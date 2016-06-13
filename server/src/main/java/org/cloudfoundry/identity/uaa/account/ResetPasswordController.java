@@ -30,6 +30,7 @@ import org.cloudfoundry.identity.uaa.util.JsonUtils;
 import org.cloudfoundry.identity.uaa.util.UaaUrlUtils;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -65,6 +66,9 @@ public class ResetPasswordController {
     private final Pattern emailPattern;
     private final ExpiringCodeStore codeStore;
     private final UaaUserDatabase userDatabase;
+
+    @Value("${c2s.uaa.host}")
+    private String c2sUaaHost;
 
     public ResetPasswordController(ResetPasswordService resetPasswordService,
                                    MessageService messageService,
@@ -134,7 +138,9 @@ public class ResetPasswordController {
     }
 
     private String getCodeSentEmailHtml(String code, String email) {
-        String resetUrl = uaaUrlUtils.getUaaUrl("/reset_password");
+        //TODO: uaa under edge server and now resetUrl dependent on request host this cause to redirect to login page
+        //String resetUrl = uaaUrlUtils.getUaaUrl("/reset_password");
+        String resetUrl = c2sUaaHost + "/reset_password";
 
         final Context ctx = new Context();
         ctx.setVariable("serviceName", getServiceName());
