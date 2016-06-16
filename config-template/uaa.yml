@@ -45,6 +45,11 @@ oauth:
       authorized-grant-types: client_credentials
       scope: uaa.none
       authorities: phr.patient_read,phr.allPatientProfiles_read,scim.write,scim.read,scim.create,uaa.admin
+    azhec-hie:
+      secret: azhec-hie-secret
+      authorized-grant-types: client_credentials
+      scope: uaa.none
+      authorities: pep.patient_read
 scim:
   groups:
     phr.hie_read: Access your health information
@@ -64,6 +69,7 @@ scim:
     pcm.clinicalDocument_delete: Delete current clinical document
     pcm.activity_read: Access the patient activity history
     ppUI.access: Access patient portal UI
+    pep.patient_read: Access policy enforcement point
   users:
     - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.allPatientProfiles_read,phr.hie_write,phr.allPatients_read,phr.patient_read,registration.write,uaa.admin,patientUser.read,patientUser.write,adminUI.access
 c2s:
