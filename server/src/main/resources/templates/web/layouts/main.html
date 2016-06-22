@@ -22,9 +22,9 @@
     <link href="/resources/oss/stylesheets/application.css" th:href="@{${assetBaseUrl}+'/stylesheets/application.css'}" rel="stylesheet"/>
     <link href="/resources/oss/stylesheets/main.css" th:href="@{${assetBaseUrl}+'/stylesheets/main.css'}" rel="stylesheet"/>
 
-    <style th:with="logo=${@environment.getProperty('login.branding.productLogo')}" th:text="'.header-image {' + (${isUaa} ? |background-image: url(@{${logo != null ? 'data:image/png;base64,'+logo : assetBaseUrl+'/images/c2s.png'}});|) + '}'">
+    <style th:with="logo=${@environment.getProperty('login.branding.productLogo')}" th:text="'.header-image {' + (${isUaa} ? |background-image: url(@{${logo != null ? 'data:image/png;base64,'+logo : assetBaseUrl+'/images/consent2share_white.png'}});|) + '}'">
         .header-image {
-            background-image: url(/resources/oss/images/c2s.png);
+            background-image: url(/resources/oss/images/consent2share_white.png);
         }
     </style>
 </head>
