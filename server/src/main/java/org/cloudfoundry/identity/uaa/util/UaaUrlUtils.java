@@ -15,6 +15,7 @@
 package org.cloudfoundry.identity.uaa.util;
 
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -23,14 +24,10 @@ import javax.servlet.http.HttpServletRequest;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Collection;
-import java.util.Set;
-import java.util.regex.Pattern;
 
-public class UaaUrlUtils {
+public abstract class UaaUrlUtils {
 
-    public UaaUrlUtils() {}
-
-    public String getUaaUrl() {
+    public static String getUaaUrl() {
         return getUaaUrl("");
     }
 
@@ -38,7 +35,7 @@ public class UaaUrlUtils {
         return getURIBuilder(path).build().toUriString();
     }
 
-    public String getUaaHost() {
+    public static String getUaaHost() {
         return getURIBuilder("").build().getHost();
     }
 
@@ -47,14 +44,20 @@ public class UaaUrlUtils {
         return builder;
     }
 
-    public static String findMatchingRedirectUri(Collection<String> wildcardUris, String requestedRedirectUri) {
-        if (wildcardUris != null) {
-            Set<Pattern> wildcards = UaaStringUtils.constructWildcards(wildcardUris);
-            if (UaaStringUtils.matches(wildcards, requestedRedirectUri)) {
+    public static String findMatchingRedirectUri(Collection<String> redirectUris, String requestedRedirectUri, String fallbackRedirectUri) {
+        AntPathMatcher matcher = new AntPathMatcher();
+
+        if (redirectUris == null) {
+            return requestedRedirectUri;
+        }
+
+        for (String pattern : redirectUris) {
+            if (matcher.match(pattern, requestedRedirectUri)) {
                 return requestedRedirectUri;
             }
         }
-        return null;
+
+        return fallbackRedirectUri;
     }
 
     public static String getHostForURI(String uri) {

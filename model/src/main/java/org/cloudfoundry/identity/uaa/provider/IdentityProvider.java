@@ -12,11 +12,13 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.provider;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonGenerator;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -34,9 +36,11 @@ import java.util.Date;
 
 import static org.cloudfoundry.identity.uaa.constants.OriginKeys.KEYSTONE;
 import static org.cloudfoundry.identity.uaa.constants.OriginKeys.LDAP;
+import static org.cloudfoundry.identity.uaa.constants.OriginKeys.OIDC10;
 import static org.cloudfoundry.identity.uaa.constants.OriginKeys.SAML;
 import static org.cloudfoundry.identity.uaa.constants.OriginKeys.UAA;
 import static org.cloudfoundry.identity.uaa.constants.OriginKeys.UNKNOWN;
+import static org.cloudfoundry.identity.uaa.constants.OriginKeys.OAUTH20;
 
 @JsonSerialize(using = IdentityProvider.IdentityProviderSerializer.class)
 @JsonDeserialize(using = IdentityProvider.IdentityProviderDeserializer.class)
@@ -118,9 +122,9 @@ public class IdentityProvider<T extends AbstractIdentityProviderDefinition> {
     }
 
     public IdentityProvider setConfig(T config) {
-        if (config == null && this.type == null) {
+        if (config == null) {
             this.type = UNKNOWN;
-        } else if (config !=null){
+        } else {
             Class clazz = config.getClass();
             if (SamlIdentityProviderDefinition.class.isAssignableFrom(clazz)) {
                 this.type = SAML;
@@ -132,6 +136,10 @@ public class IdentityProvider<T extends AbstractIdentityProviderDefinition> {
                 }
             } else if (UaaIdentityProviderDefinition.class.isAssignableFrom(clazz)) {
                 this.type = UAA;
+            } else if (RawXOAuthIdentityProviderDefinition.class.isAssignableFrom(clazz)) {
+                this.type = OAUTH20;
+            } else if (XOIDCIdentityProviderDefinition.class.isAssignableFrom(clazz)) {
+                this.type = OIDC10;
             } else if (LdapIdentityProviderDefinition.class.isAssignableFrom(clazz)) {
                 this.type = LDAP;
             } else if (KeystoneIdentityProviderDefinition.class.isAssignableFrom(clazz)) {
@@ -187,31 +195,6 @@ public class IdentityProvider<T extends AbstractIdentityProviderDefinition> {
             ((SamlIdentityProviderDefinition)config).setZoneId(identityZoneId);
         }
         return this;
-    }
-
-    public boolean configIsValid() {
-        if (UAA.equals(originKey)) {
-            UaaIdentityProviderDefinition configValue = ObjectUtils.castInstance(getConfig(), UaaIdentityProviderDefinition.class);
-            if (configValue == null) {
-                return true;
-            }
-            PasswordPolicy passwordPolicy = configValue.getPasswordPolicy();
-            LockoutPolicy lockoutPolicy= configValue.getLockoutPolicy();
-
-            if (passwordPolicy == null && lockoutPolicy == null) {
-                return true;
-            } else {
-                boolean isValid = true;
-                if(passwordPolicy != null) {
-                    isValid = passwordPolicy.allPresentAndPositive();
-                }
-                if(lockoutPolicy != null) {
-                    isValid = isValid && lockoutPolicy.allPresentAndPositive();
-                }
-                return isValid;
-            }
-        }
-        return true;
     }
 
     @Override
@@ -290,12 +273,29 @@ public class IdentityProvider<T extends AbstractIdentityProviderDefinition> {
         return sb.toString();
     }
 
+    private boolean serializeConfigRaw;
+
+    @JsonIgnore
+    public boolean isSerializeConfigRaw() {
+        return serializeConfigRaw;
+    }
+
+    @JsonIgnore
+    public void setSerializeConfigRaw(boolean serializeConfigRaw) {
+        this.serializeConfigRaw = serializeConfigRaw;
+    }
+
     public static class IdentityProviderSerializer extends JsonSerializer<IdentityProvider> {
         @Override
         public void serialize(IdentityProvider value, JsonGenerator gen, SerializerProvider serializers) throws IOException, JsonProcessingException {
             gen.writeStartObject();
             gen.writeStringField(FIELD_TYPE, value.getType());
-            gen.writeStringField(FIELD_CONFIG, JsonUtils.writeValueAsString(value.getConfig()));
+
+            if(value.isSerializeConfigRaw()) {
+                gen.writeObjectField(FIELD_CONFIG, value.getConfig());
+            } else {
+                gen.writeStringField(FIELD_CONFIG, JsonUtils.writeValueAsString(value.getConfig()));
+            }
             gen.writeStringField(FIELD_ID, value.getId());
             gen.writeStringField(FIELD_ORIGIN_KEY, value.getOriginKey());
             gen.writeStringField(FIELD_NAME, value.getName());
@@ -323,12 +323,24 @@ public class IdentityProvider<T extends AbstractIdentityProviderDefinition> {
             JsonNode node = JsonUtils.readTree(jp);
             String type = getNodeAsString(node, FIELD_TYPE, UNKNOWN);
             //deserialize based on type
-            String config = getNodeAsString(node, FIELD_CONFIG, null);
+            String config;
+            JsonNode configNode = node.get("config");
+            if (configNode.isTextual()) {
+                config = configNode.textValue();
+            } else {
+                config = configNode.toString();
+            }
             AbstractIdentityProviderDefinition definition = null;
             if (StringUtils.hasText(config)) {
                 switch (type) {
                     case SAML:
                         definition = JsonUtils.readValue(config, SamlIdentityProviderDefinition.class);
+                        break;
+                    case OAUTH20:
+                        definition = JsonUtils.readValue(config, RawXOAuthIdentityProviderDefinition.class);
+                        break;
+                    case OIDC10:
+                        definition = JsonUtils.readValue(config, XOIDCIdentityProviderDefinition.class);
                         break;
                     case UAA:
                         definition = JsonUtils.readValue(config, UaaIdentityProviderDefinition.class);

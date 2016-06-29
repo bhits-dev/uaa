@@ -45,7 +45,7 @@ You can also build the app and push it to Cloud Foundry, e.g.
 Our recommended way is to use a manifest file, but you can do everything on the command line.
 
     $ ./gradlew :cloudfoundry-identity-uaa:war
-    $ cf push myuaa --no-start -m 512M -p uaa/build/libs/cloudfoundry-identity-uaa-2.3.2-SNAPSHOT.war 
+    $ cf push myuaa --no-start -m 1024M -p uaa/build/libs/cloudfoundry-identity-uaa-2.3.2-SNAPSHOT.war 
     $ cf set-env myuaa SPRING_PROFILES_ACTIVE default,hsqldb
     $ cf set-env myuaa UAA_URL http://myuaa.<domain>
     $ cf set-env myuaa LOGIN_URL http://myuaa.<domain>
@@ -218,7 +218,7 @@ For example, to deploy the UAA as a Cloud Foundry application, you can provide a
     ---
       applications:
       - name: standalone-uaa-cf-war
-        memory: 512M
+        memory: 1024M
         instances: 1
         host: standalone-uaa
         path: cloudfoundry-identity-uaa-3.0.0-SNAPSHOT.war
@@ -244,7 +244,7 @@ Notice how uaa.url can be converted into an environment variable called UAA_URL
     ---
       applications:
       - name: standalone-uaa-cf-war
-        memory: 512M
+        memory: 1024M
         instances: 1
         host: standalone-uaa
         path: cloudfoundry-identity-uaa-3.0.0-SNAPSHOT.war
@@ -448,6 +448,9 @@ grabbed from the open id provider
 
 Here are some ways for you to get involved in the community:
 
+* The UAA has two requirements
+  * JDK 1.8.0
+  * PhantomJS, for integration test, [http://phantomjs.org/download.html](http://phantomjs.org/download.html)
 * Get involved with the Cloud Foundry community on the mailing lists.
   Please help out on the
   [mailing list](https://lists.cloudfoundry.org)
@@ -460,9 +463,13 @@ Here are some ways for you to get involved in the community:
   want to contribute code this way, please reference an existing issue
   if there is one as well covering the specific issue you are
   addressing.  Always submit pull requests to the "develop" branch.
+  We strictly adhere to test driven development. We kindly ask that 
+  pull requests are accompanied with test cases that would be failing
+  if ran separately from the pull request.
 * Watch for upcoming articles on Cloud Foundry by
   [subscribing](http://blog.cloudfoundry.org) to the cloudfoundry.org
   blog
+
 
 ## Acknowledgements
 

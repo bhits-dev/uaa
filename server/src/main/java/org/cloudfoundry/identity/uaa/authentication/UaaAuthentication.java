@@ -12,10 +12,12 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.authentication;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.saml.context.SAMLMessageContext;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -35,7 +37,7 @@ import static java.util.Collections.EMPTY_MAP;
 @JsonDeserialize(using = UaaAuthenticationDeserializer.class)
 public class UaaAuthentication implements Authentication, Serializable {
 
-    private List<? extends GrantedAuthority> authorities;
+    private Collection<? extends GrantedAuthority> authorities;
     private Object credentials;
     private UaaPrincipal principal;
     private UaaAuthenticationDetails details;
@@ -45,6 +47,10 @@ public class UaaAuthentication implements Authentication, Serializable {
     private Set<String> externalGroups;
     private Map<String, List<String>> userAttributes;
 
+    //This is used when UAA acts as a SAML IdP
+    @JsonIgnore
+    private SAMLMessageContext samlMessageContext;
+
     /**
      * Creates a token with the supplied array of authorities.
      *
@@ -52,14 +58,14 @@ public class UaaAuthentication implements Authentication, Serializable {
      *            principal represented by this authentication object.
      */
     public UaaAuthentication(UaaPrincipal principal,
-                             List<? extends GrantedAuthority> authorities,
+                             Collection<? extends GrantedAuthority> authorities,
                              UaaAuthenticationDetails details) {
         this(principal, null, authorities, details, true, System.currentTimeMillis());
     }
 
     public UaaAuthentication(UaaPrincipal principal,
                              Object credentials,
-                             List<? extends GrantedAuthority> authorities,
+                             Collection<? extends GrantedAuthority> authorities,
                              UaaAuthenticationDetails details,
                              boolean authenticated,
                              long authenticatedTime) {
@@ -68,7 +74,7 @@ public class UaaAuthentication implements Authentication, Serializable {
 
     public UaaAuthentication(UaaPrincipal principal,
                              Object credentials,
-                             List<? extends GrantedAuthority> authorities,
+                             Collection<? extends GrantedAuthority> authorities,
                              UaaAuthenticationDetails details,
                              boolean authenticated,
                              long authenticatedTime,
@@ -193,6 +199,16 @@ public class UaaAuthentication implements Authentication, Serializable {
         for (Map.Entry<String, List<String>> entry : userAttributes.entrySet()) {
             this.userAttributes.put(entry.getKey(), entry.getValue());
         }
+    }
+
+    @JsonIgnore
+    public SAMLMessageContext getSamlMessageContext() {
+        return samlMessageContext;
+    }
+
+    @JsonIgnore
+    public void setSamlMessageContext(SAMLMessageContext samlMessageContext) {
+        this.samlMessageContext = samlMessageContext;
     }
 
 }

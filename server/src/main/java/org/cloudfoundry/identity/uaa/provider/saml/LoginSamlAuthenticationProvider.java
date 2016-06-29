@@ -126,7 +126,7 @@ public class LoginSamlAuthenticationProvider extends SAMLAuthenticationProvider 
         SAMLAuthenticationToken token = (SAMLAuthenticationToken) authentication;
         SAMLMessageContext context = token.getCredentials();
         String alias = context.getPeerExtendedMetadata().getAlias();
-        boolean addNew = true;
+        boolean addNew;
         IdentityProvider<SamlIdentityProviderDefinition> idp;
         SamlIdentityProviderDefinition samlConfig;
         try {
@@ -134,15 +134,25 @@ public class LoginSamlAuthenticationProvider extends SAMLAuthenticationProvider 
             samlConfig = idp.getConfig();
             addNew = samlConfig.isAddShadowUserOnLogin();
             if (!idp.isActive()) {
-                throw new ProviderNotFoundException("Identity Provider has been disabled by administrator.");
+                throw new ProviderNotFoundException("Identity Provider has been disabled by administrator for alias:"+alias);
             }
         } catch (EmptyResultDataAccessException x) {
-            throw new ProviderNotFoundException("Not identity provider found in zone.");
+            throw new ProviderNotFoundException("No SAML identity provider found in zone for alias:"+alias);
         }
         ExpiringUsernameAuthenticationToken result = getExpiringUsernameAuthenticationToken(authentication);
         UaaPrincipal samlPrincipal = new UaaPrincipal(OriginKeys.NotANumber, result.getName(), result.getName(), alias, result.getName(), zone.getId());
         Collection<? extends GrantedAuthority> samlAuthorities = retrieveSamlAuthorities(samlConfig, (SAMLCredential) result.getCredentials());
-        Collection<? extends GrantedAuthority> authorities = mapAuthorities(idp.getOriginKey(), samlAuthorities);
+
+        Collection<? extends GrantedAuthority> authorities = null;
+        SamlIdentityProviderDefinition.ExternalGroupMappingMode groupMappingMode = idp.getConfig().getGroupMappingMode();
+        switch (groupMappingMode) {
+            case EXPLICITLY_MAPPED:
+                authorities = mapAuthorities(idp.getOriginKey(), samlAuthorities);
+            break;
+            case AS_SCOPES:
+                authorities = new LinkedList<>(samlAuthorities);
+            break;
+        }
 
         Set<String> filteredExternalGroups = filterSamlAuthorities(samlConfig, samlAuthorities);
         MultiValueMap<String, String> userAttributes = retrieveUserAttributes(samlConfig, (SAMLCredential) result.getCredentials());
@@ -185,17 +195,17 @@ public class LoginSamlAuthenticationProvider extends SAMLAuthenticationProvider 
     public Collection<? extends GrantedAuthority> retrieveSamlAuthorities(SamlIdentityProviderDefinition definition, SAMLCredential credential)  {
         Collection<SamlUserAuthority> authorities = new ArrayList<>();
         if (definition.getAttributeMappings().get(GROUP_ATTRIBUTE_NAME)!=null) {
-            List<String> groupNames = new LinkedList<>();
+            List<String> attributeNames = new LinkedList<>();
             if (definition.getAttributeMappings().get(GROUP_ATTRIBUTE_NAME) instanceof String) {
-                groupNames.add((String) definition.getAttributeMappings().get(GROUP_ATTRIBUTE_NAME));
+                attributeNames.add((String) definition.getAttributeMappings().get(GROUP_ATTRIBUTE_NAME));
             } else if (definition.getAttributeMappings().get(GROUP_ATTRIBUTE_NAME) instanceof Collection) {
-                groupNames.addAll((Collection) definition.getAttributeMappings().get(GROUP_ATTRIBUTE_NAME));
+                attributeNames.addAll((Collection) definition.getAttributeMappings().get(GROUP_ATTRIBUTE_NAME));
             }
             for (Attribute attribute : credential.getAttributes()) {
-                if ((groupNames.contains(attribute.getName())) || (groupNames.contains(attribute.getFriendlyName()))) {
+                if ((attributeNames.contains(attribute.getName())) || (attributeNames.contains(attribute.getFriendlyName()))) {
                     if (attribute.getAttributeValues() != null && attribute.getAttributeValues().size() > 0) {
                         for (XMLObject group : attribute.getAttributeValues()) {
-                            authorities.add(new SamlUserAuthority(((XSString) group).getValue()));
+                            authorities.add(new SamlUserAuthority(getStringValue(attribute.getName(),definition,group)));
                         }
                     }
                 }
@@ -253,7 +263,7 @@ public class LoginSamlAuthenticationProvider extends SAMLAuthenticationProvider 
             logger.debug(String.format("Found SAML user attribute %s of value %s [zone:%s, origin:%s]", key, value, definition.getZoneId(), definition.getIdpEntityAlias()));
             return value;
         }  else if (xmlObject !=null){
-            logger.debug(String.format("SAML user attribute %s at is not of type XSString, %s [zone:%s, origin:%s]", key, xmlObject.getClass().getName(),definition.getZoneId(), definition.getIdpEntityAlias()));
+            logger.debug(String.format("SAML user attribute %s at is not of type XSString or other recognizable type, %s [zone:%s, origin:%s]", key, xmlObject.getClass().getName(),definition.getZoneId(), definition.getIdpEntityAlias()));
         }
         return null;
     }

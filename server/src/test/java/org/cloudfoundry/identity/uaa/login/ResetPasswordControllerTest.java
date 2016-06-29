@@ -13,24 +13,23 @@
 package org.cloudfoundry.identity.uaa.login;
 
 import org.cloudfoundry.identity.uaa.TestClassNullifier;
-import org.cloudfoundry.identity.uaa.codestore.ExpiringCode;
-import org.cloudfoundry.identity.uaa.codestore.ExpiringCodeStore;
-import org.cloudfoundry.identity.uaa.error.UaaException;
-import org.cloudfoundry.identity.uaa.message.MessageService;
-import org.cloudfoundry.identity.uaa.message.MessageType;
 import org.cloudfoundry.identity.uaa.account.ConflictException;
 import org.cloudfoundry.identity.uaa.account.ForgotPasswordInfo;
 import org.cloudfoundry.identity.uaa.account.NotFoundException;
 import org.cloudfoundry.identity.uaa.account.ResetPasswordController;
 import org.cloudfoundry.identity.uaa.account.ResetPasswordService;
 import org.cloudfoundry.identity.uaa.account.ResetPasswordService.ResetPasswordResponse;
+import org.cloudfoundry.identity.uaa.codestore.ExpiringCode;
+import org.cloudfoundry.identity.uaa.codestore.ExpiringCodeStore;
+import org.cloudfoundry.identity.uaa.error.UaaException;
 import org.cloudfoundry.identity.uaa.login.test.ThymeleafConfig;
+import org.cloudfoundry.identity.uaa.message.MessageService;
+import org.cloudfoundry.identity.uaa.message.MessageType;
 import org.cloudfoundry.identity.uaa.scim.ScimMeta;
 import org.cloudfoundry.identity.uaa.scim.ScimUser;
 import org.cloudfoundry.identity.uaa.scim.exception.InvalidPasswordException;
 import org.cloudfoundry.identity.uaa.user.UaaUser;
 import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
-import org.cloudfoundry.identity.uaa.util.UaaUrlUtils;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 import org.cloudfoundry.identity.uaa.zone.MultitenancyFixture;
@@ -97,7 +96,7 @@ public class ResetPasswordControllerTest extends TestClassNullifier {
         codeStore = mock(ExpiringCodeStore.class);
         userDatabase = mock(UaaUserDatabase.class);
         when(userDatabase.retrieveUserById(anyString())).thenReturn(new UaaUser("username","password","email","givenname","familyname"));
-        ResetPasswordController controller = new ResetPasswordController(resetPasswordService, messageService, templateEngine, new UaaUrlUtils(), companyName, codeStore, userDatabase);
+        ResetPasswordController controller = new ResetPasswordController(resetPasswordService, messageService, templateEngine, companyName, codeStore, userDatabase);
 
         InternalResourceViewResolver viewResolver = new InternalResourceViewResolver();
         viewResolver.setPrefix("/WEB-INF/jsp");
@@ -138,7 +137,7 @@ public class ResetPasswordControllerTest extends TestClassNullifier {
     }
 
     private void forgotPasswordWithConflict(String zoneDomain, String companyName) throws Exception {
-        new ResetPasswordController(resetPasswordService, messageService, templateEngine, new UaaUrlUtils(), companyName, codeStore, userDatabase);
+        new ResetPasswordController(resetPasswordService, messageService, templateEngine, companyName, codeStore, userDatabase);
         String domain = zoneDomain == null ? "localhost" : zoneDomain + ".localhost";
         when(resetPasswordService.forgotPassword("user@example.com", "", "")).thenThrow(new ConflictException("abcd"));
         MockHttpServletRequestBuilder post = post("/forgot_password.do")
@@ -183,12 +182,12 @@ public class ResetPasswordControllerTest extends TestClassNullifier {
 
     @Test
     public void forgotPassword_Successful() throws Exception {
-        forgotPasswordSuccessful("http://localhost/reset_password?code=code1&amp;email=user%40example.com");
+        forgotPasswordSuccessful("http://localhost/reset_password?code=code1");
     }
 
     @Test
     public void forgotPassword_SuccessfulDefaultCompanyName() throws Exception {
-        ResetPasswordController controller = new ResetPasswordController(resetPasswordService, messageService, templateEngine, new UaaUrlUtils(), "", codeStore, userDatabase);
+        ResetPasswordController controller = new ResetPasswordController(resetPasswordService, messageService, templateEngine, "", codeStore, userDatabase);
         InternalResourceViewResolver viewResolver = new InternalResourceViewResolver();
         viewResolver.setPrefix("/WEB-INF/jsp");
         viewResolver.setSuffix(".jsp");
@@ -196,14 +195,14 @@ public class ResetPasswordControllerTest extends TestClassNullifier {
                 .standaloneSetup(controller)
                 .setViewResolvers(viewResolver)
                 .build();
-        forgotPasswordSuccessful("http://localhost/reset_password?code=code1&amp;email=user%40example.com", "Cloud Foundry", null);
+        forgotPasswordSuccessful("http://localhost/reset_password?code=code1", "Cloud Foundry", null);
     }
 
     @Test
     public void forgotPassword_SuccessfulInOtherZone() throws Exception {
         IdentityZone zone = MultitenancyFixture.identityZone("test-zone-id", "testsubdomain");
         IdentityZoneHolder.set(zone);
-        forgotPasswordSuccessful("http://testsubdomain.localhost/reset_password?code=code1&amp;email=user%40example.com", "The Twiglet Zone", zone);
+        forgotPasswordSuccessful("http://testsubdomain.localhost/reset_password?code=code1", "The Twiglet Zone", zone);
     }
 
     private void forgotPasswordSuccessful(String url) throws Exception {
