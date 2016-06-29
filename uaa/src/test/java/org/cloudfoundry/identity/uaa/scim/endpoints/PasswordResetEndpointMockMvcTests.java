@@ -23,6 +23,7 @@ import org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils;
 import org.cloudfoundry.identity.uaa.scim.ScimUser;
 import org.cloudfoundry.identity.uaa.test.TestClient;
 import org.cloudfoundry.identity.uaa.util.JsonUtils;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.springframework.security.oauth2.common.util.OAuth2Utils;
@@ -53,6 +54,7 @@ public class PasswordResetEndpointMockMvcTests extends InjectedMockContextTest {
 
     private String loginToken;
     private ScimUser user;
+    private RandomValueStringGenerator originalGenerator;
 
     @Before
     public void setUp() throws Exception {
@@ -63,6 +65,11 @@ public class PasswordResetEndpointMockMvcTests extends InjectedMockContextTest {
         user.setPrimaryEmail(user.getUserName());
         user.setPassword("secr3T");
         user = MockMvcUtils.utils().createUser(getMockMvc(), adminToken, user);
+    }
+
+    @After
+    public void resetGenerator() {
+        getWebApplicationContext().getBean(JdbcExpiringCodeStore.class).setGenerator(new RandomValueStringGenerator(24));
     }
 
     @Test
@@ -86,12 +93,12 @@ public class PasswordResetEndpointMockMvcTests extends InjectedMockContextTest {
                 .andExpect(jsonPath("$.code").value("test" + generator.counter.get()));
 
         ExpiringCode expiringCode = store.retrieveCode("test" + generator.counter.get());
+        assertThat(expiringCode.getIntent(), is(ExpiringCodeType.AUTOLOGIN.name()));
         Map<String,String> data = JsonUtils.readValue(expiringCode.getData(), new TypeReference<Map<String,String>>() {});
         assertThat(data.get("user_id"), is(user.getId()));
         assertThat(data.get("username"), is(user.getUserName()));
         assertThat(data.get(OAuth2Utils.CLIENT_ID), is("login"));
         assertThat(data.get(OriginKeys.ORIGIN), is(OriginKeys.UAA));
-        assertThat(data.get("action"), is(ExpiringCodeType.AUTOLOGIN.name()));
     }
 
     @Test

@@ -12,8 +12,16 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.scim.jdbc;
 
-import org.cloudfoundry.identity.uaa.constants.OriginKeys;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import org.cloudfoundry.identity.uaa.audit.event.EntityDeletedEvent;
+import org.cloudfoundry.identity.uaa.constants.OriginKeys;
 import org.cloudfoundry.identity.uaa.provider.IdentityProvider;
 import org.cloudfoundry.identity.uaa.resources.jdbc.JdbcPagingListFactory;
 import org.cloudfoundry.identity.uaa.scim.ScimGroup;
@@ -31,14 +39,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
-
-import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 import static org.cloudfoundry.identity.uaa.constants.OriginKeys.LOGIN_SERVER;
 import static org.cloudfoundry.identity.uaa.constants.OriginKeys.UAA;
@@ -173,6 +173,16 @@ public class JdbcScimGroupMembershipManagerTests extends JdbcTestBase {
         IdentityZone zone = MultitenancyFixture.identityZone(id,id);
         IdentityZoneHolder.set(zone);
         assertEquals(0,dao.query("origin eq \"" + OriginKeys.UAA + "\"").size());
+        IdentityZoneHolder.clear();
+        assertEquals(4,dao.query("origin eq \"" + OriginKeys.UAA + "\"").size());
+        assertEquals(4,dao.query("origin eq \"" + OriginKeys.UAA + "\"", "member_id", true).size());
+        assertEquals(4,dao.query("origin eq \"" + OriginKeys.UAA + "\"", "1,2", true).size());
+        assertEquals(4,dao.query("origin eq \"" + OriginKeys.UAA + "\"", "origin", true).size());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void cannotQuery_Filter_Has_Unknown_Sort() throws Exception {
+        dao.query("origin eq \"" + OriginKeys.UAA + "\"", "unknown,origin", true);
     }
 
 
@@ -265,7 +275,7 @@ public class JdbcScimGroupMembershipManagerTests extends JdbcTestBase {
         assertThat(jdbcTemplate.queryForObject("select count(*) from external_group_mapping where group_id in (select id from groups where identity_zone_id=?)", new Object[]{IdentityZoneHolder.get().getId()}, Integer.class), is(3));
         assertThat(jdbcTemplate.queryForObject("select count(*) from group_membership where group_id in (select id from groups where identity_zone_id=? and displayName like ?)", new Object[]{IdentityZone.getUaa().getId(), "zones." + IdentityZoneHolder.get().getId() + ".%"}, Integer.class), is(1));
         assertThat(jdbcTemplate.queryForObject("select count(*) from groups where identity_zone_id=? and displayName like ?", new Object[]{IdentityZone.getUaa().getId(), "zones." + IdentityZoneHolder.get().getId() + ".%"}, Integer.class), is(1));
-        gdao.onApplicationEvent(new EntityDeletedEvent<>(zone));
+        gdao.onApplicationEvent(new EntityDeletedEvent<>(zone, null));
         assertThat(jdbcTemplate.queryForObject("select count(*) from group_membership where group_id in (select id from groups where identity_zone_id=?)", new Object[]{IdentityZoneHolder.get().getId()}, Integer.class), is(0));
         assertThat(jdbcTemplate.queryForObject("select count(*) from groups where identity_zone_id=?", new Object[]{IdentityZoneHolder.get().getId()}, Integer.class), is(0));
         assertThat(jdbcTemplate.queryForObject("select count(*) from external_group_mapping where group_id in (select id from groups where identity_zone_id=?)", new Object[]{IdentityZoneHolder.get().getId()}, Integer.class), is(0));
@@ -285,7 +295,7 @@ public class JdbcScimGroupMembershipManagerTests extends JdbcTestBase {
             new IdentityProvider()
                 .setOriginKey(LOGIN_SERVER)
                 .setIdentityZoneId(zone.getId());
-        gdao.onApplicationEvent(new EntityDeletedEvent<>(loginServer));
+        gdao.onApplicationEvent(new EntityDeletedEvent<>(loginServer, null));
         assertThat(jdbcTemplate.queryForObject("select count(*) from group_membership where group_id in (select id from groups where identity_zone_id=?)", new Object[] {IdentityZoneHolder.get().getId()}, Integer.class), is(0));
         assertThat(jdbcTemplate.queryForObject("select count(*) from groups where identity_zone_id=?", new Object[] {IdentityZoneHolder.get().getId()}, Integer.class), is(3));
         assertThat(jdbcTemplate.queryForObject("select count(*) from external_group_mapping where origin = ? and group_id in (select id from groups where identity_zone_id=?)", new Object[] {LOGIN_SERVER, IdentityZoneHolder.get().getId()}, Integer.class), is(0));
@@ -296,7 +306,7 @@ public class JdbcScimGroupMembershipManagerTests extends JdbcTestBase {
         addMembers();
         assertThat(jdbcTemplate.queryForObject("select count(*) from group_membership where group_id in (select id from groups where identity_zone_id=?)", new Object[] {IdentityZoneHolder.get().getId()}, Integer.class), is(4));
         assertThat(jdbcTemplate.queryForObject("select count(*) from groups where identity_zone_id=?", new Object[] {IdentityZoneHolder.get().getId()}, Integer.class), is(4));
-        gdao.onApplicationEvent(new EntityDeletedEvent<>(IdentityZone.getUaa()));
+        gdao.onApplicationEvent(new EntityDeletedEvent<>(IdentityZone.getUaa(), null));
         assertThat(jdbcTemplate.queryForObject("select count(*) from group_membership where group_id in (select id from groups where identity_zone_id=?)", new Object[] {IdentityZoneHolder.get().getId()}, Integer.class), is(4));
         assertThat(jdbcTemplate.queryForObject("select count(*) from groups where identity_zone_id=?", new Object[] {IdentityZoneHolder.get().getId()}, Integer.class), is(4));
     }
@@ -311,7 +321,7 @@ public class JdbcScimGroupMembershipManagerTests extends JdbcTestBase {
             new IdentityProvider()
                 .setOriginKey(UAA)
                 .setIdentityZoneId(zone.getId());
-        gdao.onApplicationEvent(new EntityDeletedEvent<>(loginServer));
+        gdao.onApplicationEvent(new EntityDeletedEvent<>(loginServer, null));
         assertThat(jdbcTemplate.queryForObject("select count(*) from group_membership where group_id in (select id from groups where identity_zone_id=?)", new Object[] {IdentityZoneHolder.get().getId()}, Integer.class), is(4));
         assertThat(jdbcTemplate.queryForObject("select count(*) from groups where identity_zone_id=?", new Object[] {IdentityZoneHolder.get().getId()}, Integer.class), is(3));
 
@@ -386,11 +396,11 @@ public class JdbcScimGroupMembershipManagerTests extends JdbcTestBase {
         addMember("g1", "g2", "GROUP", "READER");
         addMember("g3", "m2", "USER", "READER,WRITER");
 
-        List<ScimGroupMember> members = dao.getMembers("g1");
+        List<ScimGroupMember> members = dao.getMembers("g1", null, false);
         assertNotNull(members);
         assertEquals(2, members.size());
 
-        members = dao.getMembers("g2");
+        members = dao.getMembers("g2", null, false);
         assertNotNull(members);
         assertEquals(0, members.size());
 
@@ -402,7 +412,7 @@ public class JdbcScimGroupMembershipManagerTests extends JdbcTestBase {
         addMember("g1", "g2", "GROUP", "READER");
         addMember("g3", "m2", "USER", "READER,WRITER");
         IdentityZoneHolder.set(MultitenancyFixture.identityZone(generator.generate(), generator.generate()));
-        assertEquals(0, dao.getMembers("g1").size());
+        assertEquals(0, dao.getMembers("g1", null, false).size());
     }
 
     @Test
@@ -411,7 +421,7 @@ public class JdbcScimGroupMembershipManagerTests extends JdbcTestBase {
         addMember("g1", "g2", "GROUP", "member");
         addMember("g1", "m2", "USER", "READER,write");
 
-        List<ScimGroupMember> members = dao.getMembers("g1");
+        List<ScimGroupMember> members = dao.getMembers("g1", null, false);
         assertNotNull(members);
         assertEquals(3, members.size());
         List<ScimGroupMember> readers = new ArrayList<ScimGroupMember>(), writers = new ArrayList<ScimGroupMember>();

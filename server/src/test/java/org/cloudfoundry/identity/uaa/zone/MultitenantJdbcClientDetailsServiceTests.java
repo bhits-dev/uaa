@@ -3,6 +3,7 @@ package org.cloudfoundry.identity.uaa.zone;
 import org.cloudfoundry.identity.uaa.audit.event.EntityDeletedEvent;
 import org.cloudfoundry.identity.uaa.oauth.client.ClientConstants;
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationVersion;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -57,7 +58,7 @@ public class MultitenantJdbcClientDetailsServiceTests {
         EmbeddedDatabaseBuilder builder = new EmbeddedDatabaseBuilder();
         db = builder.build();
         Flyway flyway = new Flyway();
-        flyway.setInitVersion("1.5.2");
+        flyway.setBaselineVersion(MigrationVersion.fromVersion("1.5.2"));
         flyway.setLocations("classpath:/org/cloudfoundry/identity/uaa/db/hsqldb/");
         flyway.setDataSource(db);
         flyway.migrate();
@@ -95,7 +96,7 @@ public class MultitenantJdbcClientDetailsServiceTests {
         addApproval(id);
         assertThat(jdbcTemplate.queryForObject("select count(*) from authz_approvals where client_id=?", new Object[] {id}, Integer.class), is(1));
 
-        service.onApplicationEvent(new EntityDeletedEvent<>(IdentityZoneHolder.get()));
+        service.onApplicationEvent(new EntityDeletedEvent<>(IdentityZoneHolder.get(), null));
         assertThat(jdbcTemplate.queryForObject("select count(*) from oauth_client_details where identity_zone_id=?", new Object[] {IdentityZoneHolder.get().getId()}, Integer.class), is(0));
         assertThat(jdbcTemplate.queryForObject("select count(*) from authz_approvals where client_id=?", new Object[] {id}, Integer.class), is(0));
     }
@@ -112,7 +113,7 @@ public class MultitenantJdbcClientDetailsServiceTests {
         addApproval(id);
         assertThat(jdbcTemplate.queryForObject("select count(*) from authz_approvals where client_id=?", new Object[] {id}, Integer.class), is(1));
 
-        service.onApplicationEvent(new EntityDeletedEvent<>(IdentityZoneHolder.get()));
+        service.onApplicationEvent(new EntityDeletedEvent<>(IdentityZoneHolder.get(), null));
         assertThat(jdbcTemplate.queryForObject("select count(*) from oauth_client_details where identity_zone_id=?", new Object[] {IdentityZoneHolder.get().getId()}, Integer.class), is(1));
         assertThat(jdbcTemplate.queryForObject("select count(*) from authz_approvals where client_id=?", new Object[] {id}, Integer.class), is (1));
     }

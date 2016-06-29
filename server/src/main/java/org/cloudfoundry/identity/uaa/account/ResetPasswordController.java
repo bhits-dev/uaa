@@ -23,8 +23,10 @@ import org.cloudfoundry.identity.uaa.error.UaaException;
 import org.cloudfoundry.identity.uaa.message.MessageService;
 import org.cloudfoundry.identity.uaa.message.MessageType;
 import org.cloudfoundry.identity.uaa.scim.ScimUser;
+import org.cloudfoundry.identity.uaa.scim.endpoints.PasswordChange;
 import org.cloudfoundry.identity.uaa.scim.exception.InvalidPasswordException;
 import org.cloudfoundry.identity.uaa.user.UaaAuthority;
+import org.cloudfoundry.identity.uaa.user.UaaUser;
 import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
 import org.cloudfoundry.identity.uaa.util.JsonUtils;
 import org.cloudfoundry.identity.uaa.util.UaaUrlUtils;
@@ -61,7 +63,6 @@ public class ResetPasswordController {
     private final ResetPasswordService resetPasswordService;
     private final MessageService messageService;
     private final TemplateEngine templateEngine;
-    private final UaaUrlUtils uaaUrlUtils;
     private final String companyName;
     private final Pattern emailPattern;
     private final ExpiringCodeStore codeStore;
@@ -73,14 +74,12 @@ public class ResetPasswordController {
     public ResetPasswordController(ResetPasswordService resetPasswordService,
                                    MessageService messageService,
                                    TemplateEngine templateEngine,
-                                   UaaUrlUtils uaaUrlUtils,
                                    String companyName,
                                    ExpiringCodeStore codeStore,
                                    UaaUserDatabase userDatabase) {
         this.resetPasswordService = resetPasswordService;
         this.messageService = messageService;
         this.templateEngine = templateEngine;
-        this.uaaUrlUtils = uaaUrlUtils;
         this.companyName = companyName;
         emailPattern = Pattern.compile("^\\S+@\\S+\\.\\S+$");
         this.codeStore = codeStore;
@@ -115,7 +114,7 @@ public class ResetPasswordController {
         try {
             ForgotPasswordInfo forgotPasswordInfo = resetPasswordService.forgotPassword(email, clientId, redirectUri);
             userId = forgotPasswordInfo.getUserId();
-            htmlContent = getCodeSentEmailHtml(forgotPasswordInfo.getResetPasswordCode().getCode(), email);
+            htmlContent = getCodeSentEmailHtml(forgotPasswordInfo.getResetPasswordCode().getCode());
         } catch (ConflictException e) {
             htmlContent = getResetUnavailableEmailHtml(email);
             userId = e.getUserId();
@@ -137,21 +136,20 @@ public class ResetPasswordController {
         return serviceName + " account password reset request";
     }
 
-    private String getCodeSentEmailHtml(String code, String email) {
-        //TODO: uaa under edge server and now resetUrl dependent on request host this cause to redirect to login page
-        //String resetUrl = uaaUrlUtils.getUaaUrl("/reset_password");
+    private String getCodeSentEmailHtml(String code) {
+        //String resetUrl = UaaUrlUtils.getUaaUrl("/reset_password");
+        //TODO: uaa under edge server and based on configurations in edge server resetUrl will address to invalid reset page
         String resetUrl = c2sUaaHost + "/reset_password";
 
         final Context ctx = new Context();
         ctx.setVariable("serviceName", getServiceName());
         ctx.setVariable("code", code);
-        ctx.setVariable("email", email);
         ctx.setVariable("resetUrl", resetUrl);
         return templateEngine.process("reset_password", ctx);
     }
 
     private String getResetUnavailableEmailHtml(String email) {
-        String hostname = uaaUrlUtils.getUaaHost();
+        String hostname = UaaUrlUtils.getUaaHost();
 
         final Context ctx = new Context();
         ctx.setVariable("serviceName", getServiceName());
@@ -173,16 +171,18 @@ public class ResetPasswordController {
         return "email_sent";
     }
 
-    @RequestMapping(value = "/reset_password", method = RequestMethod.GET, params = { "email", "code" })
+    @RequestMapping(value = "/reset_password", method = RequestMethod.GET, params = { "code" })
     public String resetPasswordPage(Model model,
                                     HttpServletResponse response,
-                                    @RequestParam("code") String code,
-                                    @RequestParam("email") String email) {
+                                    @RequestParam("code") String code) {
 
         ExpiringCode expiringCode = validateUserAndClient(codeStore.retrieveCode(code));
         if (expiringCode==null) {
             return handleUnprocessableEntity(model, response, "message_code", "bad_code");
         } else {
+            PasswordChange change = JsonUtils.readValue(expiringCode.getData(), PasswordChange.class);
+            UaaUser user = userDatabase.retrieveUserById(change.getUserId());
+            String email = user.getEmail();
             Timestamp fiveMinutes = new Timestamp(System.currentTimeMillis()+(1000*60*5));
             model.addAttribute("code", codeStore.generateCode(expiringCode.getData(), fiveMinutes, null).getCode());
             model.addAttribute("email", email);

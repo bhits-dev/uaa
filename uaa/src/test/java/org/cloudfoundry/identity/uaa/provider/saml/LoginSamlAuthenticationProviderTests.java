@@ -118,7 +118,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
     WebSSOProfileConsumer consumer;
     SAMLCredential credential;
     SAMLLogger samlLogger = mock(SAMLLogger.class);
-    SamlIdentityProviderDefinition providerDefinition = new SamlIdentityProviderDefinition();
+    SamlIdentityProviderDefinition providerDefinition;
     private IdentityProvider provider;
     private ScimUserProvisioning userProvisioning;
     private JdbcScimGroupExternalMembershipManager externalManager;
@@ -168,10 +168,16 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
             impl.setValue((String)value);
             xmlObjects.add(impl);
         } else if (value instanceof List) {
-            for (String s : (List<String>)value) {
-                AttributedStringImpl impl = new AttributedStringImpl("", "", "");
-                impl.setValue(s);
-                xmlObjects.add(impl);
+            for (String s : (List<String>) value) {
+                if (SAML_USER.equals(s)) {
+                    XSAnyImpl impl = new XSAnyImpl("","","") {};
+                    impl.setTextContent(s);
+                    xmlObjects.add(impl);
+                } else {
+                    AttributedStringImpl impl = new AttributedStringImpl("", "", "");
+                    impl.setValue(s);
+                    xmlObjects.add(impl);
+                }
             }
         } else {
             AttributedStringImpl impl = new AttributedStringImpl("", "", "");
@@ -184,6 +190,8 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 
     @Before
     public void configureProvider() throws Exception {
+        providerDefinition = new SamlIdentityProviderDefinition();
+
         userProvisioning = new JdbcScimUserProvisioning(jdbcTemplate, new JdbcPagingListFactory(jdbcTemplate, limitSqlAdapter));
         ScimGroupProvisioning groupProvisioning = new JdbcScimGroupProvisioning(jdbcTemplate, new JdbcPagingListFactory(jdbcTemplate, limitSqlAdapter));
 
@@ -289,6 +297,24 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
                        new SimpleGrantedAuthority(UAA_SAML_TEST),
                        new SimpleGrantedAuthority(UaaAuthority.UAA_USER.getAuthority())
                    )
+        );
+    }
+
+    @Test
+    public void test_external_groups_as_scopes() throws Exception {
+        providerDefinition.setGroupMappingMode(SamlIdentityProviderDefinition.ExternalGroupMappingMode.AS_SCOPES);
+        providerDefinition.addAttributeMapping(GROUP_ATTRIBUTE_NAME, Arrays.asList("2ndgroups", "groups"));
+        provider.setConfig(providerDefinition);
+        providerProvisioning.update(provider);
+        UaaAuthentication authentication = getAuthentication();
+        assertThat(authentication.getAuthorities(),
+                containsInAnyOrder(
+                        new SimpleGrantedAuthority(SAML_ADMIN),
+                        new SimpleGrantedAuthority(SAML_USER),
+                        new SimpleGrantedAuthority(SAML_TEST),
+                        new SimpleGrantedAuthority(SAML_NOT_MAPPED),
+                        new SimpleGrantedAuthority(UaaAuthority.UAA_USER.getAuthority())
+                )
         );
     }
 
@@ -565,7 +591,8 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
     }
 
     protected UaaAuthentication getAuthentication() {
-        Authentication authentication = authprovider.authenticate(mockSamlAuthentication(OriginKeys.SAML));
+        SAMLAuthenticationToken authentication1 = mockSamlAuthentication(OriginKeys.SAML);
+        Authentication authentication = authprovider.authenticate(authentication1);
         assertNotNull("Authentication should exist", authentication);
         assertTrue("Authentication should be UaaAuthentication", authentication instanceof UaaAuthentication);
         return (UaaAuthentication)authentication;

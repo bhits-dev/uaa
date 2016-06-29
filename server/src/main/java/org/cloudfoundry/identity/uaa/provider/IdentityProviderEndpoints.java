@@ -1,15 +1,16 @@
-/*******************************************************************************
- *     Cloud Foundry
- *     Copyright (c) [2009-2015] Pivotal Software, Inc. All Rights Reserved.
+/*
+ * *****************************************************************************
+ *      Cloud Foundry
+ *      Copyright (c) [2009-2016] Pivotal Software, Inc. All Rights Reserved.
+ *      This product is licensed to you under the Apache License, Version 2.0 (the "License").
+ *      You may not use this product except in compliance with the License.
  *
- *     This product is licensed to you under the Apache License, Version 2.0 (the "License").
- *     You may not use this product except in compliance with the License.
- *
- *     This product includes a number of subcomponents with
- *     separate copyright notices and license terms. Your use of these
- *     subcomponents is subject to the terms and conditions of the
- *     subcomponent's license, as noted in the LICENSE file.
- *******************************************************************************/
+ *      This product includes a number of subcomponents with
+ *      separate copyright notices and license terms. Your use of these
+ *      subcomponents is subject to the terms and conditions of the
+ *      subcomponent's license, as noted in the LICENSE file.
+ * *****************************************************************************
+ */
 package org.cloudfoundry.identity.uaa.provider;
 
 import org.apache.commons.logging.Log;
@@ -34,6 +35,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -69,6 +71,7 @@ public class IdentityProviderEndpoints implements ApplicationEventPublisherAware
     private final ScimGroupProvisioning scimGroupProvisioning;
     private final NoOpLdapLoginAuthenticationManager noOpManager = new NoOpLdapLoginAuthenticationManager();
     private final SamlIdentityProviderConfigurator samlConfigurator;
+    private final IdentityProviderConfigValidationDelegator configValidator;
     private ApplicationEventPublisher publisher = null;
 
     @Override
@@ -80,18 +83,25 @@ public class IdentityProviderEndpoints implements ApplicationEventPublisherAware
         IdentityProviderProvisioning identityProviderProvisioning,
         ScimGroupExternalMembershipManager scimGroupExternalMembershipManager,
         ScimGroupProvisioning scimGroupProvisioning,
-        SamlIdentityProviderConfigurator samlConfigurator
-    ) {
+        SamlIdentityProviderConfigurator samlConfigurator,
+        IdentityProviderConfigValidationDelegator configValidator) {
         this.identityProviderProvisioning = identityProviderProvisioning;
         this.scimGroupExternalMembershipManager = scimGroupExternalMembershipManager;
         this.scimGroupProvisioning = scimGroupProvisioning;
         this.samlConfigurator = samlConfigurator;
+        this.configValidator = configValidator;
     }
 
     @RequestMapping(method = POST)
-    public ResponseEntity<IdentityProvider> createIdentityProvider(@RequestBody IdentityProvider body) throws MetadataProviderException{
+    public ResponseEntity<IdentityProvider> createIdentityProvider(@RequestBody IdentityProvider body, @RequestParam(required = false, defaultValue = "false") boolean rawConfig) throws MetadataProviderException{
+        body.setSerializeConfigRaw(rawConfig);
         String zoneId = IdentityZoneHolder.get().getId();
         body.setIdentityZoneId(zoneId);
+        try {
+            configValidator.validate(body.getConfig(), body.getType());
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(body, UNPROCESSABLE_ENTITY);
+        }
         if (OriginKeys.SAML.equals(body.getType())) {
             SamlIdentityProviderDefinition definition = ObjectUtils.castInstance(body.getConfig(), SamlIdentityProviderDefinition.class);
             definition.setZoneId(zoneId);
@@ -101,6 +111,7 @@ public class IdentityProviderEndpoints implements ApplicationEventPublisherAware
         }
         try {
             IdentityProvider createdIdp = identityProviderProvisioning.create(body);
+            createdIdp.setSerializeConfigRaw(rawConfig);
             return new ResponseEntity<>(createdIdp, CREATED);
         } catch (IdpAlreadyExistsException e) {
             return new ResponseEntity<>(body, CONFLICT);
@@ -112,10 +123,11 @@ public class IdentityProviderEndpoints implements ApplicationEventPublisherAware
 
     @RequestMapping(value = "{id}", method = DELETE)
     @Transactional
-    public ResponseEntity<IdentityProvider> deleteIdentityProvider(@PathVariable String id) throws MetadataProviderException {
+    public ResponseEntity<IdentityProvider> deleteIdentityProvider(@PathVariable String id, @RequestParam(required = false, defaultValue = "false") boolean rawConfig) throws MetadataProviderException {
         IdentityProvider existing = identityProviderProvisioning.retrieve(id);
         if (publisher!=null && existing!=null) {
-            publisher.publishEvent(new EntityDeletedEvent<>(existing));
+            existing.setSerializeConfigRaw(rawConfig);
+            publisher.publishEvent(new EntityDeletedEvent<>(existing, SecurityContextHolder.getContext().getAuthentication()));
             return new ResponseEntity<>(existing, OK);
         } else {
             return new ResponseEntity<>(UNPROCESSABLE_ENTITY);
@@ -124,13 +136,16 @@ public class IdentityProviderEndpoints implements ApplicationEventPublisherAware
 
 
     @RequestMapping(value = "{id}", method = PUT)
-    public ResponseEntity<IdentityProvider> updateIdentityProvider(@PathVariable String id, @RequestBody IdentityProvider body) throws MetadataProviderException {
+    public ResponseEntity<IdentityProvider> updateIdentityProvider(@PathVariable String id, @RequestBody IdentityProvider body, @RequestParam(required = false, defaultValue = "false") boolean rawConfig) throws MetadataProviderException {
+        body.setSerializeConfigRaw(rawConfig);
         IdentityProvider existing = identityProviderProvisioning.retrieve(id);
         String zoneId = IdentityZoneHolder.get().getId();
         body.setId(id);
         body.setIdentityZoneId(zoneId);
-        if (!body.configIsValid()) {
-            return new ResponseEntity<>(UNPROCESSABLE_ENTITY);
+        try {
+            configValidator.validate(body.getConfig(), body.getType());
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(body, UNPROCESSABLE_ENTITY);
         }
         if (OriginKeys.SAML.equals(body.getType())) {
             body.setOriginKey(existing.getOriginKey()); //we do not allow origin to change for a SAML provider, since that can cause clashes
@@ -141,19 +156,24 @@ public class IdentityProviderEndpoints implements ApplicationEventPublisherAware
             body.setConfig(definition);
         }
         IdentityProvider updatedIdp = identityProviderProvisioning.update(body);
+        updatedIdp.setSerializeConfigRaw(rawConfig);
         return new ResponseEntity<>(updatedIdp, OK);
     }
 
     @RequestMapping(method = GET)
-    public ResponseEntity<List<IdentityProvider>> retrieveIdentityProviders(@RequestParam(value = "active_only", required = false) String activeOnly) {
+    public ResponseEntity<List<IdentityProvider>> retrieveIdentityProviders(@RequestParam(value = "active_only", required = false) String activeOnly, @RequestParam(required = false, defaultValue = "false") boolean rawConfig) {
         Boolean retrieveActiveOnly = Boolean.valueOf(activeOnly);
         List<IdentityProvider> identityProviderList = identityProviderProvisioning.retrieveAll(retrieveActiveOnly, IdentityZoneHolder.get().getId());
+        for(IdentityProvider idp : identityProviderList) {
+            idp.setSerializeConfigRaw(rawConfig);
+        }
         return new ResponseEntity<>(identityProviderList, OK);
     }
 
     @RequestMapping(value = "{id}", method = GET)
-    public ResponseEntity<IdentityProvider> retrieveIdentityProvider(@PathVariable String id) {
+    public ResponseEntity<IdentityProvider> retrieveIdentityProvider(@PathVariable String id, @RequestParam(required = false, defaultValue = "false") boolean rawConfig) {
         IdentityProvider identityProvider = identityProviderProvisioning.retrieve(id);
+        identityProvider.setSerializeConfigRaw(rawConfig);
         return new ResponseEntity<>(identityProvider, OK);
     }
 

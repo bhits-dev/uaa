@@ -12,6 +12,14 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.scim.jdbc;
 
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.cloudfoundry.identity.uaa.audit.event.EntityDeletedEvent;
@@ -37,18 +45,12 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
-
 public class JdbcScimGroupProvisioning extends AbstractQueryable<ScimGroup>
     implements ScimGroupProvisioning, ApplicationListener<EntityDeletedEvent<?>>, SystemDeletable {
 
+    private JdbcScimGroupExternalMembershipManager externalGroupMappingManager;
     private JdbcTemplate jdbcTemplate;
+    private JdbcScimGroupMembershipManager membershipManager;
 
     private final Log logger = LogFactory.getLog(getClass());
 
@@ -90,6 +92,12 @@ public class JdbcScimGroupProvisioning extends AbstractQueryable<ScimGroup>
 
     public JdbcScimGroupProvisioning(JdbcTemplate jdbcTemplate, JdbcPagingListFactory pagingListFactory) {
         super(jdbcTemplate, pagingListFactory, new ScimGroupRowMapper());
+
+        this.membershipManager = new JdbcScimGroupMembershipManager(jdbcTemplate, pagingListFactory);
+        this.membershipManager.setScimGroupProvisioning(this);
+        this.externalGroupMappingManager = new JdbcScimGroupExternalMembershipManager(jdbcTemplate, pagingListFactory);
+        this.externalGroupMappingManager.setScimGroupProvisioning(this);
+
         Assert.notNull(jdbcTemplate);
         this.jdbcTemplate = jdbcTemplate;
         setQueryConverter(new ScimSearchQueryConverter());
@@ -192,6 +200,8 @@ public class JdbcScimGroupProvisioning extends AbstractQueryable<ScimGroup>
     @Override
     public ScimGroup delete(String id, int version) throws ScimResourceNotFoundException {
         ScimGroup group = retrieve(id);
+        membershipManager.removeMembersByGroupId(id);
+        externalGroupMappingManager.unmapAll(id);
         int deleted;
         if (version > 0) {
             deleted = jdbcTemplate.update(DELETE_GROUP_SQL + " and version=?;", id, IdentityZoneHolder.get().getId(),version);
@@ -221,6 +231,11 @@ public class JdbcScimGroupProvisioning extends AbstractQueryable<ScimGroup>
         if (!StringUtils.hasText(group.getZoneId())) {
             throw new ScimResourceConstraintFailedException("zoneId is a required field");
         }
+    }
+
+    @Override
+    protected void validateOrderBy(String orderBy) throws IllegalArgumentException {
+        super.validateOrderBy(orderBy, GROUP_FIELDS);
     }
 
     private static final class ScimGroupRowMapper implements RowMapper<ScimGroup> {

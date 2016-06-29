@@ -42,6 +42,9 @@ public class TokenRequest {
     private boolean idToken = false;
     private URI redirectUri;
     private String authCodeAPIToken;
+    private String state;
+    private boolean skipSslValidation = false;
+    private String authorizationCode;
 
     /**
      * Constructs a token request
@@ -99,7 +102,8 @@ public class TokenRequest {
                         clientSecret,
                         username,
                         password,
-                        redirectUri
+                        redirectUri,
+                        state
                     )
                 );
             case AUTHORIZATION_CODE_WITH_TOKEN:
@@ -112,7 +116,18 @@ public class TokenRequest {
                         username,
                         password,
                         redirectUri,
-                        authCodeAPIToken
+                        authCodeAPIToken,
+                        state
+                    )
+                );
+            case FETCH_TOKEN_FROM_CODE:
+                return !hasAnyNullValues(
+                    Arrays.asList(
+                        tokenEndpoint,
+                        clientId,
+                        clientSecret,
+                        redirectUri,
+                        authorizationCode
                     )
                 );
             default: return false;
@@ -284,7 +299,7 @@ public class TokenRequest {
      * Returns the redirect_uri for an {@link GrantType#AUTHORIZATION_CODE} or {@link GrantType#IMPLICIT} token request
      * @return the redirect_uri for an {@link GrantType#AUTHORIZATION_CODE} or {@link GrantType#IMPLICIT} token request
      */
-    public URI getRedirectUriRedirectUri() {
+    public URI getRedirectUri() {
         return redirectUri;
     }
 
@@ -335,6 +350,68 @@ public class TokenRequest {
      */
     public TokenRequest setPasscode(String passcode) {
         this.passcode = passcode;
+        return this;
+    }
+
+    /**
+     * Returns the state key, used with
+     * {@link GrantType#AUTHORIZATION_CODE} and
+     * {@link GrantType#IMPLICIT} and
+     * {@link GrantType#AUTHORIZATION_CODE_WITH_TOKEN}
+     * @return String representing a random string
+     */
+    public String getState() {
+        return state;
+    }
+
+    /**
+     * Sets the state key, used with
+     * {@link GrantType#AUTHORIZATION_CODE} and
+     * {@link GrantType#IMPLICIT} and
+     * {@link GrantType#AUTHORIZATION_CODE_WITH_TOKEN}
+     * @param state - a random string
+     * @return this mutable object
+     */
+    public TokenRequest setState(String state) {
+        this.state = state;
+        return this;
+    }
+
+    /**
+     * Set to true if you wish to skip all SSL validation
+     * Useful for self signed certificates.
+     * @param skipSslValidation
+     * @return this mutable object
+     */
+    public TokenRequest setSkipSslValidation(boolean skipSslValidation) {
+        this.skipSslValidation = skipSslValidation;
+        return this;
+    }
+
+    /**
+     * Returns true if the system will skip all SSL validation
+     * False is default
+     * @return true if the request has been configured to skip SSL validation
+     */
+    public boolean isSkipSslValidation() {
+        return skipSslValidation;
+    }
+
+    /**
+     * Sets the authorization code for a {@link GrantType#FETCH_TOKEN_FROM_CODE} grant.
+     * @return the authorization code that was set.
+     */
+    public String getAuthorizationCode() {
+        return authorizationCode;
+    }
+
+    /**
+     * Sets the  authorization code for a {@link GrantType#FETCH_TOKEN_FROM_CODE} grant.
+     * @param authorizationCode
+     * @return this mutable object
+     */
+    public TokenRequest setAuthorizationCode(String authorizationCode) {
+        this.authorizationCode = authorizationCode;
         return this;
     }
 

@@ -14,7 +14,6 @@ package org.cloudfoundry.identity.uaa.scim.endpoints;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.cloudfoundry.identity.uaa.constants.OriginKeys;
 import org.cloudfoundry.identity.uaa.resources.SearchResults;
 import org.cloudfoundry.identity.uaa.resources.SearchResultsFactory;
 import org.cloudfoundry.identity.uaa.scim.ScimCore;
@@ -62,7 +61,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import static org.cloudfoundry.identity.uaa.constants.OriginKeys.LDAP;
 import static org.cloudfoundry.identity.uaa.zone.ZoneManagementScopes.ZONE_MANAGING_SCOPE_REGEX;
+import static org.springframework.util.StringUtils.hasText;
 
 @Controller
 public class ScimGroupEndpoints {
@@ -127,7 +128,7 @@ public class ScimGroupEndpoints {
         boolean needMore = response.size() < expectedResponseSize;
         while (needMore && startIndex <= input.size()) {
             for (ScimGroup group : UaaPagingUtils.subList(input, startIndex, count)) {
-                group.setMembers(membershipManager.getMembers(group.getId()));
+                group.setMembers(membershipManager.getMembers(group.getId(), null, false));
                 response.add(group);
                 needMore = response.size() < expectedResponseSize;
                 if (!needMore) {
@@ -211,9 +212,9 @@ public class ScimGroupEndpoints {
     public ScimGroupExternalMember mapExternalGroup(@RequestBody ScimGroupExternalMember sgm) {
         try {
             String displayName = sgm.getDisplayName();
-            String groupId = sgm.getGroupId()==null?getGroupId(displayName):sgm.getGroupId();
-            String externalGroup = sgm.getExternalGroup().trim();
-            String origin = StringUtils.hasText(sgm.getOrigin()) ? sgm.getOrigin() : OriginKeys.LDAP;
+            String groupId = hasText(sgm.getGroupId()) ? sgm.getGroupId() : getGroupId(displayName);
+            String externalGroup = hasText(sgm.getExternalGroup()) ? sgm.getExternalGroup().trim() : sgm.getExternalGroup();
+            String origin = hasText(sgm.getOrigin()) ? sgm.getOrigin() : LDAP;
             return externalMembershipManager.mapExternalGroup(groupId, externalGroup, origin);
         } catch (IllegalArgumentException e) {
             throw new ScimException(e.getMessage(), HttpStatus.BAD_REQUEST);
@@ -239,8 +240,8 @@ public class ScimGroupEndpoints {
                                                       @PathVariable String externalGroup,
                                                       @PathVariable String origin) {
         try {
-            if (!StringUtils.hasText(origin)) {
-                origin = OriginKeys.LDAP;
+            if (!hasText(origin)) {
+                origin = LDAP;
             }
             return externalMembershipManager.unmapExternalGroup(groupId, externalGroup.trim(), origin);
         } catch (IllegalArgumentException e) {
@@ -257,7 +258,7 @@ public class ScimGroupEndpoints {
     @ResponseStatus(HttpStatus.OK)
     @Deprecated
     public ScimGroupExternalMember deprecatedUnmapExternalGroup(@PathVariable String groupId, @PathVariable String externalGroup) {
-        return unmapExternalGroup(groupId, externalGroup, OriginKeys.LDAP);
+        return unmapExternalGroup(groupId, externalGroup, LDAP);
     }
 
     @RequestMapping(value = { "/Groups/External/displayName/{displayName}/externalGroup/{externalGroup}" }, method = RequestMethod.DELETE)
@@ -265,7 +266,7 @@ public class ScimGroupEndpoints {
     @ResponseStatus(HttpStatus.OK)
     @Deprecated
     public ScimGroupExternalMember unmapExternalGroupUsingName(@PathVariable String displayName, @PathVariable String externalGroup) {
-        return unmapExternalGroupUsingName(displayName, externalGroup, OriginKeys.LDAP);
+        return unmapExternalGroupUsingName(displayName, externalGroup, LDAP);
     }
 
     @RequestMapping(value = { "/Groups/External/displayName/{displayName}/externalGroup/{externalGroup}/origin/{origin}" }, method = RequestMethod.DELETE)
@@ -275,8 +276,8 @@ public class ScimGroupEndpoints {
                                                                @PathVariable String externalGroup,
                                                                @PathVariable String origin) {
         try {
-            if (!StringUtils.hasText(origin)) {
-                origin = OriginKeys.LDAP;
+            if (!hasText(origin)) {
+                origin = LDAP;
             }
 
             return externalMembershipManager.unmapExternalGroup(getGroupId(displayName), externalGroup.trim(),origin);
@@ -314,7 +315,7 @@ public class ScimGroupEndpoints {
     public ScimGroup getGroup(@PathVariable String groupId, HttpServletResponse httpServletResponse) {
         logger.debug("retrieving group with id: " + groupId);
         ScimGroup group = dao.retrieve(groupId);
-        group.setMembers(membershipManager.getMembers(groupId));
+        group.setMembers(membershipManager.getMembers(groupId, null, false));
         addETagHeader(httpServletResponse, group);
         return group;
     }
@@ -336,7 +337,7 @@ public class ScimGroupEndpoints {
                 }
             }
         }
-        created.setMembers(membershipManager.getMembers(created.getId()));
+        created.setMembers(membershipManager.getMembers(created.getId(), null, false));
         addETagHeader(httpServletResponse, created);
         return created;
     }
@@ -361,7 +362,7 @@ public class ScimGroupEndpoints {
             } else {
                 membershipManager.removeMembersByGroupId(updated.getId());
             }
-            updated.setMembers(membershipManager.getMembers(updated.getId()));
+            updated.setMembers(membershipManager.getMembers(updated.getId(), null, false));
             addETagHeader(httpServletResponse, updated);
             return updated;
         } catch (IncorrectResultSizeDataAccessException ex) {
@@ -380,7 +381,7 @@ public class ScimGroupEndpoints {
     }
 
     /*
-     * SCIM spec lists the PATCH operaton as optional, so leaving it
+     * SCIM spec lists the PATCH operation as optional, so leaving it
      * un-implemented for now while we wait for
      * https://jira.springsource.org/browse/SPR-7985 which adds support for
      * RequestMethod.PATCH in version '3.2 M2'
@@ -389,7 +390,7 @@ public class ScimGroupEndpoints {
      * @RequestMapping(value = { "/Group/{groupId}", "/Groups/{groupId}" },
      * method = RequestMethod.PATCH)
      * @ResponseBody
-     * public ScimGroup updateGroup(@RequeudstBody ScimGroup group, @PathVariable
+     * public ScimGroup updateGroup(@RequestBody ScimGroup group, @PathVariable
      * String groupId,
      * @RequestHeader(value = "If-Match", required = false) String etag) {
      * }
@@ -464,7 +465,7 @@ public class ScimGroupEndpoints {
         }
         String groupId = getGroupId(groupName);
         ScimGroup group = getGroup(groupId, httpServletResponse);
-        if (!StringUtils.hasText(userId) || !StringUtils.hasText(zoneId)) {
+        if (!hasText(userId) || !hasText(zoneId)) {
             throw new ScimException("User ID and Zone ID are required.", HttpStatus.BAD_REQUEST);
         }
         if (!isMember(group, userId, ScimGroupMember.Role.MEMBER)) {
@@ -487,9 +488,11 @@ public class ScimGroupEndpoints {
     }
 
     @RequestMapping("/Groups/{groupId}/members")
-    public ResponseEntity<List<ScimGroupMember>> listGroupMemberships(@PathVariable String groupId) {
+    public ResponseEntity<List<ScimGroupMember>> listGroupMemberships(@PathVariable String groupId,
+          @RequestParam(required = false, defaultValue = "false") boolean returnEntities,
+          @RequestParam(required = false, defaultValue = "") String filter) {
         dao.retrieve(groupId);
-        List<ScimGroupMember> members = membershipManager.getMembers(groupId);
+        List<ScimGroupMember> members = membershipManager.getMembers(groupId, filter, returnEntities);
         return new ResponseEntity<>(members, HttpStatus.OK);
     }
 

@@ -18,6 +18,7 @@ import org.apache.tomcat.jdbc.pool.DataSource;
 import org.cloudfoundry.identity.uaa.account.ResetPasswordController;
 import org.cloudfoundry.identity.uaa.authentication.manager.PeriodLockoutPolicy;
 import org.cloudfoundry.identity.uaa.constants.OriginKeys;
+import org.cloudfoundry.identity.uaa.impl.config.IdentityZoneConfigurationBootstrap;
 import org.cloudfoundry.identity.uaa.impl.config.YamlServletProfileInitializer;
 import org.cloudfoundry.identity.uaa.message.EmailService;
 import org.cloudfoundry.identity.uaa.message.NotificationsService;
@@ -25,23 +26,29 @@ import org.cloudfoundry.identity.uaa.message.util.FakeJavaMailSender;
 import org.cloudfoundry.identity.uaa.oauth.UaaTokenServices;
 import org.cloudfoundry.identity.uaa.oauth.UaaTokenStore;
 import org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants;
+import org.cloudfoundry.identity.uaa.provider.AbstractXOAuthIdentityProviderDefinition;
 import org.cloudfoundry.identity.uaa.provider.IdentityProvider;
 import org.cloudfoundry.identity.uaa.provider.IdentityProviderProvisioning;
 import org.cloudfoundry.identity.uaa.provider.LdapIdentityProviderDefinition;
 import org.cloudfoundry.identity.uaa.provider.LockoutPolicy;
 import org.cloudfoundry.identity.uaa.provider.PasswordPolicy;
 import org.cloudfoundry.identity.uaa.provider.SamlIdentityProviderDefinition;
-import org.cloudfoundry.identity.uaa.provider.saml.SamlIdentityProviderConfigurator;
+import org.cloudfoundry.identity.uaa.provider.UaaIdentityProviderDefinition;
+import org.cloudfoundry.identity.uaa.provider.saml.BootstrapSamlIdentityProviderConfigurator;
 import org.cloudfoundry.identity.uaa.provider.saml.ZoneAwareMetadataGenerator;
 import org.cloudfoundry.identity.uaa.resources.jdbc.SimpleSearchQueryConverter;
 import org.cloudfoundry.identity.uaa.scim.ScimGroup;
 import org.cloudfoundry.identity.uaa.scim.ScimGroupProvisioning;
 import org.cloudfoundry.identity.uaa.security.web.CorsFilter;
+import org.cloudfoundry.identity.uaa.user.JdbcUaaUserDatabase;
+import org.cloudfoundry.identity.uaa.util.CachingPasswordEncoder;
 import org.cloudfoundry.identity.uaa.util.PredicateMatcher;
+import org.cloudfoundry.identity.uaa.web.UaaSessionCookieConfig;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
+import org.cloudfoundry.identity.uaa.zone.IdentityZoneConfiguration;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
+import org.cloudfoundry.identity.uaa.zone.IdentityZoneProvisioning;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneResolvingFilter;
-import org.cloudfoundry.identity.uaa.zone.KeyPair;
 import org.cloudfoundry.identity.uaa.zone.TokenPolicy;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -62,7 +69,6 @@ import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.oauth2.provider.code.AuthorizationCodeServices;
 import org.springframework.security.saml.log.SAMLDefaultLogger;
 import org.springframework.security.saml.websso.WebSSOProfileConsumerImpl;
-import org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.support.AbstractRefreshableWebApplicationContext;
@@ -72,17 +78,21 @@ import javax.servlet.RequestDispatcher;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 
+import static org.cloudfoundry.identity.uaa.constants.OriginKeys.OAUTH20;
+import static org.cloudfoundry.identity.uaa.constants.OriginKeys.OIDC10;
+import static org.cloudfoundry.identity.uaa.provider.ExternalIdentityProviderDefinition.FAMILY_NAME_ATTRIBUTE_NAME;
+import static org.cloudfoundry.identity.uaa.provider.ExternalIdentityProviderDefinition.GIVEN_NAME_ATTRIBUTE_NAME;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.Matchers.comparesEqualTo;
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
@@ -90,6 +100,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -130,6 +141,7 @@ public class BootstrapTests {
         System.clearProperty("spring.profiles.active");
         System.clearProperty("uaa.url");
         System.clearProperty("login.url");
+        System.clearProperty("require_https");
         if (context != null) {
             context.close();
         }
@@ -147,7 +159,34 @@ public class BootstrapTests {
 
     @Test
     public void testRootContextDefaults() throws Exception {
-        context = getServletContext(null, "login.yml","uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
+        context = getServletContext(activeProfiles, "login.yml","uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
+
+        JdbcUaaUserDatabase userDatabase = context.getBean(JdbcUaaUserDatabase.class);
+        if (activeProfiles!=null && activeProfiles.contains("mysql")) {
+            assertTrue(userDatabase.isCaseInsensitive());
+            assertEquals("marissa", userDatabase.retrieveUserByName("marissa", OriginKeys.UAA).getUsername());
+            assertEquals("marissa", userDatabase.retrieveUserByName("MArissA", OriginKeys.UAA).getUsername());
+        } else {
+            assertFalse(userDatabase.isCaseInsensitive());
+        }
+
+
+
+        assertNotNull(context.getBean("identityZoneHolderInitializer"));
+
+        assertEquals(300, context.getBean(CachingPasswordEncoder.class).getExpiryInSeconds());
+        assertEquals(true, context.getBean(CachingPasswordEncoder.class).isEnabled());
+
+        UaaSessionCookieConfig sessionCookieConfig = context.getBean(UaaSessionCookieConfig.class);
+        assertNotNull(sessionCookieConfig);
+        assertNull(sessionCookieConfig.getComment());
+        assertNull(sessionCookieConfig.getDomain());
+        assertNull(sessionCookieConfig.getPath());
+        assertNull(sessionCookieConfig.getName());
+        assertEquals(Integer.MIN_VALUE, sessionCookieConfig.getMaxAge());
+        assertTrue(sessionCookieConfig.isHttpOnly());
+        assertFalse(sessionCookieConfig.isSecure());
+
         assertNotNull(context.getBean("viewResolver", ViewResolver.class));
         assertNotNull(context.getBean("resetPasswordController", ResetPasswordController.class));
         assertEquals(864000, context.getBean("webSSOprofileConsumer", WebSSOProfileConsumerImpl.class).getMaxAuthenticationAge());
@@ -156,6 +195,27 @@ public class BootstrapTests {
         assertEquals(filter.getDefaultZoneHostnames(), defaultHostnames);
 
         assertSame(UaaTokenStore.class, context.getBean(AuthorizationCodeServices.class).getClass());
+
+        IdentityZoneProvisioning zoneProvisioning = context.getBean(IdentityZoneProvisioning.class);
+        IdentityZoneConfiguration zoneConfiguration = zoneProvisioning.retrieve(IdentityZone.getUaa().getId()).getConfig();
+        assertTrue(zoneConfiguration.getLinks().getSelfService().isSelfServiceLinksEnabled());
+        assertNull(zoneConfiguration.getLinks().getHomeRedirect());
+        assertEquals("redirect", zoneConfiguration.getLinks().getLogout().getRedirectParameterName());
+        assertEquals("/login", zoneConfiguration.getLinks().getLogout().getRedirectUrl());
+        assertNull(zoneConfiguration.getLinks().getLogout().getWhitelist());
+        assertTrue(zoneConfiguration.getLinks().getLogout().isDisableRedirectParameter());
+        assertFalse(context.getBean(IdentityZoneProvisioning.class).retrieve(IdentityZone.getUaa().getId()).getConfig().getTokenPolicy().isJwtRevocable());
+        assertEquals(
+            Arrays.asList(
+                new Prompt("username", "text", "Email"),
+                new Prompt("password", "password", "Password"),
+                new Prompt("passcode", "password", "One Time Code ( Get one at http://localhost:8080/uaa/passcode )")
+            ),
+            zoneConfiguration.getPrompts()
+        );
+
+        Object links = context.getBean("links");
+        assertEquals(Collections.EMPTY_MAP, links);
 
         //check java mail sender
         EmailService emailService = context.getBean("emailService", EmailService.class);
@@ -242,169 +302,167 @@ public class BootstrapTests {
 
         assertTrue(corFilter.getXhrConfiguration().isAllowedCredentials());
         assertFalse(corFilter.getDefaultConfiguration().isAllowedCredentials());
+
     }
 
     @Test
     public void testPropertyValuesWhenSetInYaml() throws Exception {
-        try {
-            String uaa = "uaa.some.test.domain.com";
-            String login = uaa.replace("uaa", "login");
-            System.setProperty("login.prompt.username.text","Username");
-            System.setProperty("login.prompt.password.text","Your Secret");
+        String uaa = "uaa.some.test.domain.com";
+        String login = uaa.replace("uaa", "login");
+        String profiles = System.getProperty("spring.profiles.active");
+        context = getServletContext(profiles, "login.yml", "test/bootstrap/bootstrap-test.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
 
-            System.setProperty("smtp.host", "");
-            System.setProperty("uaa.url", "https://" + uaa + ":555/uaa");
-            System.setProperty("login.url", "https://" + login + ":555/uaa");
-            System.setProperty("login.entityBaseURL", "https://" + login + ":555/uaa");
-            System.setProperty("database.maxactive", "50");
-            System.setProperty("database.maxidle", "5");
-            System.setProperty("database.removeabandoned", "true");
-            System.setProperty("database.logabandoned", "false");
-            System.setProperty("database.abandonedtimeout", "45");
-            System.setProperty("database.evictionintervalms", "30000");
-            System.setProperty("database.caseinsensitive", "true");
+        JdbcUaaUserDatabase userDatabase = context.getBean(JdbcUaaUserDatabase.class);
+        assertTrue(userDatabase.isCaseInsensitive());
 
-            System.setProperty("password.policy.minLength", "8");
-            System.setProperty("password.policy.maxLength", "100");
-            System.setProperty("password.policy.requireUpperCaseCharacter", "0");
-            System.setProperty("password.policy.requireLowerCaseCharacter", "0");
-            System.setProperty("password.policy.requireDigit", "0");
-            System.setProperty("password.policy.requireSpecialCharacter", "1");
-            System.setProperty("password.policy.expirePasswordInMonths", "6");
 
-            System.setProperty("password.policy.global.minLength", "8");
-            System.setProperty("password.policy.global.maxLength", "100");
-            System.setProperty("password.policy.global.requireUpperCaseCharacter", "0");
-            System.setProperty("password.policy.global.requireLowerCaseCharacter", "0");
-            System.setProperty("password.policy.global.requireDigit", "0");
-            System.setProperty("password.policy.global.requireSpecialCharacter", "1");
-            System.setProperty("password.policy.global.expirePasswordInMonths", "6");
+        assertEquals(600, context.getBean(CachingPasswordEncoder.class).getExpiryInSeconds());
+        assertEquals(false, context.getBean(CachingPasswordEncoder.class).isEnabled());
 
-            System.setProperty("authentication.policy.lockoutAfterFailures", "10");
-            System.setProperty("authentication.policy.countFailuresWithinSeconds", "7200");
-            System.setProperty("authentication.policy.lockoutPeriodSeconds", "600");
+        UaaSessionCookieConfig sessionCookieConfig = context.getBean(UaaSessionCookieConfig.class);
+        assertNotNull(sessionCookieConfig);
+        assertEquals("C is for Cookie", sessionCookieConfig.getComment());
+        assertEquals("sesame.com", sessionCookieConfig.getDomain());
+        assertEquals("/the/path/to/the/jar", sessionCookieConfig.getPath());
+        assertEquals("cookiemonster", sessionCookieConfig.getName());
+        assertEquals(30, sessionCookieConfig.getMaxAge());
+        assertFalse(sessionCookieConfig.isHttpOnly());
+        assertTrue(sessionCookieConfig.isSecure());
 
-            System.setProperty("authentication.policy.global.lockoutAfterFailures", "1");
-            System.setProperty("authentication.policy.global.countFailuresWithinSeconds", "2222");
-            System.setProperty("authentication.policy.global.lockoutPeriodSeconds", "152");
+        IdentityZoneProvisioning zoneProvisioning = context.getBean(IdentityZoneProvisioning.class);
+        IdentityZoneConfiguration zoneConfiguration = zoneProvisioning.retrieve(IdentityZone.getUaa().getId()).getConfig();
+        assertFalse(zoneConfiguration.getLinks().getSelfService().isSelfServiceLinksEnabled());
+        assertEquals("http://some.redirect.com/redirect", zoneConfiguration.getLinks().getHomeRedirect());
+        assertEquals("/configured_signup", zoneConfiguration.getLinks().getSelfService().getSignup());
+        assertEquals("/configured_passwd", zoneConfiguration.getLinks().getSelfService().getPasswd());
 
-            System.setProperty("jwt.token.policy.global.accessTokenValiditySeconds", "3600");
-            System.setProperty("jwt.token.policy.global.refreshTokenValiditySeconds", "7200");
+        assertEquals("redirect", zoneConfiguration.getLinks().getLogout().getRedirectParameterName());
+        assertEquals("/configured_login", zoneConfiguration.getLinks().getLogout().getRedirectUrl());
+        assertEquals(Arrays.asList("https://url1.domain1.com/logout-success","https://url2.domain2.com/logout-success"), zoneConfiguration.getLinks().getLogout().getWhitelist());
+        assertFalse(zoneConfiguration.getLinks().getLogout().isDisableRedirectParameter());
 
-            System.setProperty("jwt.token.policy.accessTokenValiditySeconds", "4800");
-            System.setProperty("jwt.token.policy.refreshTokenValiditySeconds", "9600");
+        assertEquals(SamlLoginServerKeyManagerTests.CERTIFICATE.trim(), zoneConfiguration.getSamlConfig().getCertificate().trim());
+        assertEquals(SamlLoginServerKeyManagerTests.KEY.trim(), zoneConfiguration.getSamlConfig().getPrivateKey().trim());
+        assertEquals(SamlLoginServerKeyManagerTests.PASSWORD.trim(), zoneConfiguration.getSamlConfig().getPrivateKeyPassword().trim());
 
-            context = getServletContext(null, "login.yml", "test/hostnames/uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
-            IdentityZoneResolvingFilter filter = context.getBean(IdentityZoneResolvingFilter.class);
+        assertTrue(context.getBean(IdentityZoneProvisioning.class).retrieve(IdentityZone.getUaa().getId()).getConfig().getTokenPolicy().isJwtRevocable());
 
-            assertThat(filter.getDefaultZoneHostnames(), containsInAnyOrder(uaa, login, "localhost", "host1.domain.com", "host2", "test3.localhost", "test4.localhost"));
-            DataSource ds = context.getBean(DataSource.class);
-            assertEquals(50, ds.getMaxActive());
-            assertEquals(5, ds.getMaxIdle());
-            assertTrue(ds.isRemoveAbandoned());
-            assertFalse(ds.isLogAbandoned());
-            assertEquals(45, ds.getRemoveAbandonedTimeout());
-            assertEquals(30000, ds.getTimeBetweenEvictionRunsMillis());
-            assertTrue(context.getBean(SimpleSearchQueryConverter.class).isDbCaseInsensitive());
-            //check java mail sender
-            EmailService emailService = context.getBean("emailService", EmailService.class);
-            assertNotNull("Unable to find the JavaMailSender object on EmailService for validation.", emailService.getMailSender());
-            assertEquals(FakeJavaMailSender.class, emailService.getMailSender().getClass());
+        assertEquals(
+            Arrays.asList(
+                new Prompt("username", "text", "Username"),
+                new Prompt("password", "password", "Your Secret"),
+                new Prompt("passcode", "password", "One Time Code ( Get one at https://login.some.test.domain.com:555/uaa/passcode )")
+            ),
+            zoneConfiguration.getPrompts()
+        );
 
-            PasswordPolicy passwordPolicy = context.getBean("defaultUaaPasswordPolicy",PasswordPolicy.class);
-            assertEquals(8, passwordPolicy.getMinLength());
-            assertEquals(100, passwordPolicy.getMaxLength());
-            assertEquals(0,passwordPolicy.getRequireUpperCaseCharacter());
-            assertEquals(0,passwordPolicy.getRequireLowerCaseCharacter());
-            assertEquals(0,passwordPolicy.getRequireDigit());
-            assertEquals(1,passwordPolicy.getRequireSpecialCharacter());
-            assertEquals(6, passwordPolicy.getExpirePasswordInMonths());
+        IdentityProviderProvisioning idpProvisioning = context.getBean(IdentityProviderProvisioning.class);
+        IdentityProvider<UaaIdentityProviderDefinition> uaaIdp = idpProvisioning.retrieveByOrigin(OriginKeys.UAA, IdentityZone.getUaa().getId());
+        assertTrue(uaaIdp.getConfig().isDisableInternalUserManagement());
+        assertFalse(uaaIdp.isActive());
 
-            context.getBean("globalPasswordPolicy", PasswordPolicy.class);
-            assertEquals(8, passwordPolicy.getMinLength());
-            assertEquals(100, passwordPolicy.getMaxLength());
-            assertEquals(0,passwordPolicy.getRequireUpperCaseCharacter());
-            assertEquals(0,passwordPolicy.getRequireLowerCaseCharacter());
-            assertEquals(0,passwordPolicy.getRequireDigit());
-            assertEquals(1,passwordPolicy.getRequireSpecialCharacter());
-            assertEquals(6, passwordPolicy.getExpirePasswordInMonths());
+        IdentityProvider<AbstractXOAuthIdentityProviderDefinition> oauthProvider = idpProvisioning.retrieveByOrigin("my-oauth-provider", IdentityZone.getUaa().getId());
+        assertNotNull(oauthProvider);
+        assertEquals("http://my-auth.com", oauthProvider.getConfig().getAuthUrl().toString());
+        assertEquals("http://my-token.com", oauthProvider.getConfig().getTokenUrl().toString());
+        assertEquals("my-token-key", oauthProvider.getConfig().getTokenKey());
+        assertEquals(true, oauthProvider.getConfig().isShowLinkText());
+        assertEquals("uaa", oauthProvider.getConfig().getRelyingPartyId());
+        assertEquals("secret", oauthProvider.getConfig().getRelyingPartySecret());
+        assertEquals("my-oauth-provider", oauthProvider.getOriginKey());
+        assertEquals("first_name", oauthProvider.getConfig().getAttributeMappings().get(GIVEN_NAME_ATTRIBUTE_NAME));
+        assertEquals("last_name", oauthProvider.getConfig().getAttributeMappings().get(FAMILY_NAME_ATTRIBUTE_NAME));
+        assertFalse(oauthProvider.getConfig().isAddShadowUserOnLogin());
+        assertEquals(OAUTH20, oauthProvider.getType());
+        assertEquals(Collections.singletonList("requested_scope"), oauthProvider.getConfig().getScopes());
+        assertEquals(Collections.singletonList("example.com"), oauthProvider.getConfig().getEmailDomain());
 
-            PeriodLockoutPolicy periodLockoutPolicy = context.getBean("defaultUaaLockoutPolicy", PeriodLockoutPolicy.class);
-            LockoutPolicy lockoutPolicy = periodLockoutPolicy.getLockoutPolicy();
-            Assert.assertThat(lockoutPolicy.getLockoutAfterFailures(), equalTo(10));
-            Assert.assertThat(lockoutPolicy.getCountFailuresWithin(), equalTo(7200));
-            Assert.assertThat(lockoutPolicy.getLockoutPeriodSeconds(), equalTo(600));
+        IdentityProvider<AbstractXOAuthIdentityProviderDefinition> oidcProvider = idpProvisioning.retrieveByOrigin("my-oidc-provider", IdentityZone.getUaa().getId());
+        assertNotNull(oidcProvider);
+        assertEquals("http://my-auth.com", oidcProvider.getConfig().getAuthUrl().toString());
+        assertEquals("http://my-token.com", oidcProvider.getConfig().getTokenUrl().toString());
+        assertEquals("my-token-key", oidcProvider.getConfig().getTokenKey());
+        assertEquals(true, oidcProvider.getConfig().isShowLinkText());
+        assertEquals("uaa", oidcProvider.getConfig().getRelyingPartyId());
+        assertEquals("secret", oidcProvider.getConfig().getRelyingPartySecret());
+        assertEquals("my-oidc-provider", oidcProvider.getOriginKey());
+        assertEquals("first_name", oidcProvider.getConfig().getAttributeMappings().get(GIVEN_NAME_ATTRIBUTE_NAME));
+        assertEquals("last_name", oidcProvider.getConfig().getAttributeMappings().get(FAMILY_NAME_ATTRIBUTE_NAME));
+        assertTrue(oidcProvider.getConfig().isAddShadowUserOnLogin());
+        assertEquals(OIDC10, oidcProvider.getType());
+        assertEquals(Collections.singletonList("requested_scope"), oauthProvider.getConfig().getScopes());
 
-            PeriodLockoutPolicy globalPeriodLockoutPolicy = context.getBean("globalPeriodLockoutPolicy", PeriodLockoutPolicy.class);
-            LockoutPolicy globalLockoutPolicy = globalPeriodLockoutPolicy.getLockoutPolicy();
-            Assert.assertThat(globalLockoutPolicy.getLockoutAfterFailures(), equalTo(1));
-            Assert.assertThat(globalLockoutPolicy.getCountFailuresWithin(), equalTo(2222));
-            Assert.assertThat(globalLockoutPolicy.getLockoutPeriodSeconds(), equalTo(152));
+        IdentityZoneResolvingFilter filter = context.getBean(IdentityZoneResolvingFilter.class);
+        assertThat(filter.getDefaultZoneHostnames(), containsInAnyOrder(uaa, login, "localhost", "host1.domain.com", "host2", "test3.localhost", "test4.localhost"));
+        DataSource ds = context.getBean(DataSource.class);
+        assertEquals(50, ds.getMaxActive());
+        assertEquals(5, ds.getMaxIdle());
+        assertTrue(ds.isRemoveAbandoned());
+        assertFalse(ds.isLogAbandoned());
+        assertEquals(45, ds.getRemoveAbandonedTimeout());
+        assertEquals(30000, ds.getTimeBetweenEvictionRunsMillis());
+        assertTrue(context.getBean(SimpleSearchQueryConverter.class).isDbCaseInsensitive());
+        //check java mail sender
+        EmailService emailService = context.getBean("emailService", EmailService.class);
+        assertNotNull("Unable to find the JavaMailSender object on EmailService for validation.", emailService.getMailSender());
+        assertEquals(FakeJavaMailSender.class, emailService.getMailSender().getClass());
 
-            UaaTokenServices uaaTokenServices = context.getBean("tokenServices",UaaTokenServices.class);
-            Assert.assertThat(uaaTokenServices.getTokenPolicy().getAccessTokenValidity(), equalTo(3600));
-            Assert.assertThat(uaaTokenServices.getTokenPolicy().getRefreshTokenValidity(), equalTo(7200));
+        PasswordPolicy passwordPolicy = context.getBean("defaultUaaPasswordPolicy",PasswordPolicy.class);
+        assertEquals(8, passwordPolicy.getMinLength());
+        assertEquals(100, passwordPolicy.getMaxLength());
+        assertEquals(0,passwordPolicy.getRequireUpperCaseCharacter());
+        assertEquals(0,passwordPolicy.getRequireLowerCaseCharacter());
+        assertEquals(0,passwordPolicy.getRequireDigit());
+        assertEquals(1,passwordPolicy.getRequireSpecialCharacter());
+        assertEquals(6, passwordPolicy.getExpirePasswordInMonths());
 
-            TokenPolicy tokenPolicy = context.getBean("uaaTokenPolicy",TokenPolicy.class);
-            Assert.assertThat(tokenPolicy.getAccessTokenValidity(), equalTo(4800));
-            Assert.assertThat(tokenPolicy.getRefreshTokenValidity(), equalTo(9600));
+        context.getBean("globalPasswordPolicy", PasswordPolicy.class);
+        assertEquals(8, passwordPolicy.getMinLength());
+        assertEquals(100, passwordPolicy.getMaxLength());
+        assertEquals(0,passwordPolicy.getRequireUpperCaseCharacter());
+        assertEquals(0,passwordPolicy.getRequireLowerCaseCharacter());
+        assertEquals(0,passwordPolicy.getRequireDigit());
+        assertEquals(1,passwordPolicy.getRequireSpecialCharacter());
+        assertEquals(6, passwordPolicy.getExpirePasswordInMonths());
 
-            List<Prompt> prompts = (List<Prompt>) context.getBean("prompts");
-            assertNotNull(prompts);
-            assertEquals(3, prompts.size());
-            Prompt passcode = prompts.get(0);
-            assertEquals("Username", passcode.getDetails()[1]);
-            passcode = prompts.get(1);
-            assertEquals("Your Secret", passcode.getDetails()[1]);
-            passcode = prompts.get(2);
-            assertEquals("One Time Code ( Get one at https://login.some.test.domain.com:555/uaa/passcode )", passcode.getDetails()[1]);
+        PeriodLockoutPolicy periodLockoutPolicy = context.getBean("defaultUaaLockoutPolicy", PeriodLockoutPolicy.class);
+        LockoutPolicy lockoutPolicy = periodLockoutPolicy.getLockoutPolicy();
+        Assert.assertThat(lockoutPolicy.getLockoutAfterFailures(), equalTo(10));
+        Assert.assertThat(lockoutPolicy.getCountFailuresWithin(), equalTo(7200));
+        Assert.assertThat(lockoutPolicy.getLockoutPeriodSeconds(), equalTo(600));
 
-        } finally {
-            System.clearProperty("login.entityBaseURL");
-            System.clearProperty("login.prompt.username.text");
-            System.clearProperty("login.prompt.password.text");
+        PeriodLockoutPolicy globalPeriodLockoutPolicy = context.getBean("globalPeriodLockoutPolicy", PeriodLockoutPolicy.class);
+        LockoutPolicy globalLockoutPolicy = globalPeriodLockoutPolicy.getLockoutPolicy();
+        Assert.assertThat(globalLockoutPolicy.getLockoutAfterFailures(), equalTo(1));
+        Assert.assertThat(globalLockoutPolicy.getCountFailuresWithin(), equalTo(2222));
+        Assert.assertThat(globalLockoutPolicy.getLockoutPeriodSeconds(), equalTo(152));
 
-            System.clearProperty("database.maxactive");
-            System.clearProperty("database.maxidle");
-            System.clearProperty("database.removeabandoned");
-            System.clearProperty("database.logabandoned");
-            System.clearProperty("database.abandonedtimeout");
-            System.clearProperty("database.evictionintervalms");
-            System.clearProperty("smtp.host");
+        UaaTokenServices uaaTokenServices = context.getBean("tokenServices",UaaTokenServices.class);
+        Assert.assertThat(uaaTokenServices.getTokenPolicy().getAccessTokenValidity(), equalTo(3600));
+        Assert.assertThat(uaaTokenServices.getTokenPolicy().getRefreshTokenValidity(), equalTo(7200));
 
-            System.clearProperty("password.policy.minLength");
-            System.clearProperty("password.policy.maxLength");
-            System.clearProperty("password.policy.requireUpperCaseCharacter");
-            System.clearProperty("password.policy.requireLowerCaseCharacter");
-            System.clearProperty("password.policy.requireDigit");
-            System.clearProperty("password.policy.requireSpecialCharacter");
-            System.clearProperty("password.policy.expirePasswordInMonths");
+        TokenPolicy tokenPolicy = context.getBean("uaaTokenPolicy",TokenPolicy.class);
+        Assert.assertThat(tokenPolicy.getAccessTokenValidity(), equalTo(4800));
+        Assert.assertThat(tokenPolicy.getRefreshTokenValidity(), equalTo(9600));
 
-            System.clearProperty("password.policy.global.minLength");
-            System.clearProperty("password.policy.global.maxLength");
-            System.clearProperty("password.policy.global.requireUpperCaseCharacter");
-            System.clearProperty("password.policy.global.requireLowerCaseCharacter");
-            System.clearProperty("password.policy.global.requireDigit");
-            System.clearProperty("password.policy.global.requireSpecialCharacter");
-            System.clearProperty("password.policy.global.expirePasswordInMonths");
-
-            System.clearProperty("authentication.policy.lockoutAfterFailures");
-            System.clearProperty("authentication.policy.countFailuresWithinSeconds");
-            System.clearProperty("authentication.policy.lockoutPeriodSeconds");
-
-            System.clearProperty("authentication.policy.global.lockoutAfterFailures");
-            System.clearProperty("authentication.policy.global.countFailuresWithinSeconds");
-            System.clearProperty("authentication.policy.global.lockoutPeriodSeconds");
-            System.clearProperty("token.policy.global.accessTokenValiditySeconds");
-            System.clearProperty("token.policy.global.refreshTokenValiditySeconds");
-            System.clearProperty("token.policy.refreshTokenValiditySeconds");
-            System.clearProperty("token.policy.refreshTokenValiditySeconds");
-        }
+        List<Prompt> prompts = (List<Prompt>) context.getBean("prompts");
+        assertNotNull(prompts);
+        assertEquals(3, prompts.size());
+        Prompt passcode = prompts.get(0);
+        assertEquals("Username", passcode.getDetails()[1]);
+        passcode = prompts.get(1);
+        assertEquals("Your Secret", passcode.getDetails()[1]);
+        passcode = prompts.get(2);
+        assertEquals("One Time Code ( Get one at https://login.some.test.domain.com:555/uaa/passcode )", passcode.getDetails()[1]);
     }
 
     @Test
-    public void testDefaultInternalHostnamesAndNoDBSettings() throws Exception {
+    public void testDefaultInternalHostnamesAndNoDBSettings_and_Cookie_isSecure() throws Exception {
         try {
+            //testing to see if session cookie config confirms to this
+            System.setProperty("require_https","true");
+
+
             System.setProperty("smtp.host","localhost");
             //travis profile script overrides these properties
             System.setProperty("database.maxactive", "100");
@@ -414,6 +472,12 @@ public class BootstrapTests {
             System.setProperty("uaa.url", "https://" + uaa + ":555/uaa");
             System.setProperty("login.url", "https://" + login + ":555/uaa");
             context = getServletContext(null, "login.yml", "uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
+
+            UaaSessionCookieConfig sessionCookieConfig = context.getBean(UaaSessionCookieConfig.class);
+            assertNotNull(sessionCookieConfig);
+            assertTrue(sessionCookieConfig.isSecure());
+
+
             IdentityZoneResolvingFilter filter = context.getBean(IdentityZoneResolvingFilter.class);
             Set<String> defaultHostnames = new HashSet<>(Arrays.asList(uaa, login, "localhost"));
             assertEquals(filter.getDefaultZoneHostnames(), defaultHostnames);
@@ -437,6 +501,9 @@ public class BootstrapTests {
         } finally {
             System.clearProperty("database.maxactive");
             System.clearProperty("database.maxidle");
+            System.clearProperty("smtp.host");
+            System.clearProperty("uaa.url");
+            System.clearProperty("login.url");
         }
     }
 
@@ -459,6 +526,13 @@ public class BootstrapTests {
     }
 
     @Test
+    public void bootstrap_idpDiscoveryEnabled_from_yml() throws Exception {
+        context = getServletContext(null, "login.yml", "test/bootstrap/bootstrap-test.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
+        IdentityZoneConfigurationBootstrap bean = context.getBean(IdentityZoneConfigurationBootstrap.class);
+        assertTrue(bean.isIdpDiscoveryEnabled());
+    }
+
+    @Test
     public void testBootstrappedIdps_and_ExcludedClaims_and_CorsConfig() throws Exception {
 
         //generate login.yml with SAML and uaa.yml with LDAP
@@ -466,7 +540,7 @@ public class BootstrapTests {
         context = getServletContext("ldap,default", true, "test/bootstrap/login.yml,login.yml","test/bootstrap/uaa.yml,uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
         assertNotNull(context.getBean("viewResolver", ViewResolver.class));
         assertNotNull(context.getBean("resetPasswordController", ResetPasswordController.class));
-        SamlIdentityProviderConfigurator samlProviders = context.getBean("metaDataProviders", SamlIdentityProviderConfigurator.class);
+        BootstrapSamlIdentityProviderConfigurator samlProviders = context.getBean(BootstrapSamlIdentityProviderConfigurator.class);
         IdentityProviderProvisioning providerProvisioning = context.getBean("identityProviderProvisioning", IdentityProviderProvisioning.class);
         //ensure that ldap has been loaded up
         assertFalse(context.getBean(SimpleSearchQueryConverter.class).isDbCaseInsensitive());
@@ -486,9 +560,12 @@ public class BootstrapTests {
         assertNotNull(ldapProvider);
         assertEquals("Test LDAP Provider Description", ldapProvider.getConfig().getProviderDescription());
 
-        IdentityProvider<SamlIdentityProviderDefinition> samlProvider =
-            providerProvisioning.retrieveByOrigin("okta-local", IdentityZone.getUaa().getId());
+        IdentityProvider<SamlIdentityProviderDefinition> samlProvider = providerProvisioning.retrieveByOrigin("okta-local", IdentityZone.getUaa().getId());
         assertEquals("Test Okta Preview 1 Description", samlProvider.getConfig().getProviderDescription());
+        assertEquals(SamlIdentityProviderDefinition.ExternalGroupMappingMode.EXPLICITLY_MAPPED, samlProvider.getConfig().getGroupMappingMode());
+
+        IdentityProvider<SamlIdentityProviderDefinition> samlProvider2 = providerProvisioning.retrieveByOrigin("okta-local-2", IdentityZone.getUaa().getId());
+        assertEquals(SamlIdentityProviderDefinition.ExternalGroupMappingMode.AS_SCOPES, samlProvider2.getConfig().getGroupMappingMode());
 
         CorsFilter filter = context.getBean(CorsFilter.class);
 
@@ -502,22 +579,19 @@ public class BootstrapTests {
             assertThat(configuration.getAllowedOrigins(), containsInAnyOrder("^example.com.*", "foo.com"));
             assertThat(configuration.getAllowedMethods(), containsInAnyOrder("PUT", "POST", "GET"));
         }
-
-
-
     }
 
     @Test
-    public void bootstrap_map_of_signing_and_verification_keys_in_default_zone() {
+    public void bootstrap_map_of_signing_and_verification_keys_in_default_zone() throws NoSuchAlgorithmException {
         context = getServletContext("ldap,default", true, "test/bootstrap/login.yml,login.yml", "test/bootstrap/uaa.yml,uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
         TokenPolicy uaaTokenPolicy = context.getBean("uaaTokenPolicy", TokenPolicy.class);
         assertThat(uaaTokenPolicy, is(notNullValue()));
-        assertThat(uaaTokenPolicy.getKeys().size(), comparesEqualTo(1));
-        Map<String, KeyPair> keys = uaaTokenPolicy.getKeys();
-        assertThat(keys.keySet(), contains("key-id-1"));
-        KeyPair key = keys.get("key-id-1");
-        assertThat(key.getSigningKey(), containsString("test-signing-key"));
-        assertThat(key.getVerificationKey(), containsString("test-verification-key"));
+        assertThat(uaaTokenPolicy.getKeys().size(), comparesEqualTo(2));
+        Map<String, String> keys = uaaTokenPolicy.getKeys();
+        assertTrue(keys.keySet().contains("key-id-1"));
+        String signingKey = keys.get("key-id-1");
+        assertThat(signingKey, containsString("test-signing-key"));
+        assertThat(uaaTokenPolicy.getActiveKeyId(), is("key-id-2"));
     }
 
     @Test
@@ -529,34 +603,8 @@ public class BootstrapTests {
         Assume.assumeTrue(context.getEnvironment().getProperty("login.idpMetadataURL") == null);
         assertNotNull(context.getBean("viewResolver", ViewResolver.class));
         assertNotNull(context.getBean("samlLogger", SAMLDefaultLogger.class));
-        assertFalse(context.getBean(SamlIdentityProviderConfigurator.class).isLegacyMetadataTrustCheck());
-        assertEquals(0, context.getBean(SamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions().size());
-        SimpleUrlLogoutSuccessHandler handler = context.getBean(SimpleUrlLogoutSuccessHandler.class);
-        Method getDefaultTargetUrl = ReflectionUtils.findMethod(SimpleUrlLogoutSuccessHandler.class, "getDefaultTargetUrl");
-        getDefaultTargetUrl.setAccessible(true);
-        Method isAlwaysUseDefaultTargetUrl = ReflectionUtils.findMethod(SimpleUrlLogoutSuccessHandler.class, "isAlwaysUseDefaultTargetUrl");
-        isAlwaysUseDefaultTargetUrl.setAccessible(true);
-        assertEquals(true, ReflectionUtils.invokeMethod(isAlwaysUseDefaultTargetUrl, handler));
-        assertEquals("/login", ReflectionUtils.invokeMethod(getDefaultTargetUrl, handler));
-    }
-
-    @Test
-    public void testLogoutRedirectConfiguration() throws Exception {
-        System.setProperty("logout.redirect.parameter.disable", "false");
-        System.setProperty("logout.redirect.url", "/login?parameter=true");
-        try {
-            context = getServletContext("default", "login.yml", "uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
-            SimpleUrlLogoutSuccessHandler handler = context.getBean(SimpleUrlLogoutSuccessHandler.class);
-            Method getDefaultTargetUrl = ReflectionUtils.findMethod(SimpleUrlLogoutSuccessHandler.class, "getDefaultTargetUrl");
-            getDefaultTargetUrl.setAccessible(true);
-            Method isAlwaysUseDefaultTargetUrl = ReflectionUtils.findMethod(SimpleUrlLogoutSuccessHandler.class, "isAlwaysUseDefaultTargetUrl");
-            isAlwaysUseDefaultTargetUrl.setAccessible(true);
-            assertEquals(false, ReflectionUtils.invokeMethod(isAlwaysUseDefaultTargetUrl, handler));
-            assertEquals("/login?parameter=true", ReflectionUtils.invokeMethod(getDefaultTargetUrl, handler));
-        } finally {
-            System.clearProperty("logout.redirect.parameter.disable");
-            System.clearProperty("logout.redirect.url");
-        }
+        assertFalse(context.getBean(BootstrapSamlIdentityProviderConfigurator.class).isLegacyMetadataTrustCheck());
+        assertEquals(0, context.getBean(BootstrapSamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions().size());
     }
 
     @Test
@@ -568,8 +616,8 @@ public class BootstrapTests {
         context = getServletContext("default", "login.yml","uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
         assertNotNull(context.getBean("viewResolver", ViewResolver.class));
         assertNotNull(context.getBean("samlLogger", SAMLDefaultLogger.class));
-        assertFalse(context.getBean(SamlIdentityProviderConfigurator.class).isLegacyMetadataTrustCheck());
-        List<SamlIdentityProviderDefinition> defs = context.getBean(SamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions();
+        assertFalse(context.getBean(BootstrapSamlIdentityProviderConfigurator.class).isLegacyMetadataTrustCheck());
+        List<SamlIdentityProviderDefinition> defs = context.getBean(BootstrapSamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions();
         assertNotNull(findProvider(defs, "testIDPFile"));
         assertEquals(
             SamlIdentityProviderDefinition.MetadataLocation.URL,
@@ -599,7 +647,7 @@ public class BootstrapTests {
         System.setProperty("login.idpMetadata", metadataString);
         System.setProperty("login.idpEntityAlias", "testIDPData");
         context = getServletContext("default,saml,configMetadata", "login.yml","uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
-        List<SamlIdentityProviderDefinition> defs = context.getBean(SamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions();
+        List<SamlIdentityProviderDefinition> defs = context.getBean(BootstrapSamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions();
         assertEquals(
             SamlIdentityProviderDefinition.MetadataLocation.DATA,
             findProvider(defs, "testIDPData").getType());
@@ -615,8 +663,8 @@ public class BootstrapTests {
         context = getServletContext("default", "login.yml","uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
         assertNotNull(context.getBean("viewResolver", ViewResolver.class));
         assertNotNull(context.getBean("samlLogger", SAMLDefaultLogger.class));
-        assertFalse(context.getBean(SamlIdentityProviderConfigurator.class).isLegacyMetadataTrustCheck());
-        List<SamlIdentityProviderDefinition> defs = context.getBean(SamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions();
+        assertFalse(context.getBean(BootstrapSamlIdentityProviderConfigurator.class).isLegacyMetadataTrustCheck());
+        List<SamlIdentityProviderDefinition> defs = context.getBean(BootstrapSamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions();
         assertEquals(
             EasySSLProtocolSocketFactory.class.getName(),
             defs.get(defs.size() - 1).getSocketFactoryClassName()
@@ -637,10 +685,10 @@ public class BootstrapTests {
         context = getServletContext("default", "login.yml","uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
         assertNotNull(context.getBean("viewResolver", ViewResolver.class));
         assertNotNull(context.getBean("samlLogger", SAMLDefaultLogger.class));
-        assertFalse(context.getBean(SamlIdentityProviderConfigurator.class).isLegacyMetadataTrustCheck());
-        List<SamlIdentityProviderDefinition> defs = context.getBean(SamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions();
+        assertFalse(context.getBean(BootstrapSamlIdentityProviderConfigurator.class).isLegacyMetadataTrustCheck());
+        List<SamlIdentityProviderDefinition> defs = context.getBean(BootstrapSamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions();
         assertFalse(
-            context.getBean(SamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions().isEmpty()
+            context.getBean(BootstrapSamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions().isEmpty()
         );
         assertEquals(
             EasySSLProtocolSocketFactory.class.getName(),

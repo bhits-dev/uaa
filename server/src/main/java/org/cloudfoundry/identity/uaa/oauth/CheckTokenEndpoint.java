@@ -14,14 +14,15 @@ package org.cloudfoundry.identity.uaa.oauth;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.cloudfoundry.identity.uaa.oauth.jwt.JwtHelper;
 import org.cloudfoundry.identity.uaa.oauth.token.Claims;
 import org.cloudfoundry.identity.uaa.util.JsonUtils;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.jwt.Jwt;
-import org.springframework.security.jwt.JwtHelper;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
+import org.springframework.security.oauth2.common.exceptions.InvalidScopeException;
 import org.springframework.security.oauth2.common.exceptions.InvalidTokenException;
 import org.springframework.security.oauth2.common.exceptions.OAuth2Exception;
 import org.springframework.security.oauth2.provider.error.DefaultWebResponseExceptionTranslator;
@@ -33,6 +34,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Controller which decodes access tokens for clients who are not able to do so
@@ -47,7 +52,6 @@ public class CheckTokenEndpoint implements InitializingBean {
     private ResourceServerTokenServices resourceServerTokenServices;
     protected final Log logger = LogFactory.getLog(getClass());
     private WebResponseExceptionTranslator exceptionTranslator = new DefaultWebResponseExceptionTranslator();
-
     public void setTokenServices(ResourceServerTokenServices resourceServerTokenServices) {
         this.resourceServerTokenServices = resourceServerTokenServices;
     }
@@ -59,7 +63,7 @@ public class CheckTokenEndpoint implements InitializingBean {
 
     @RequestMapping(value = "/check_token")
     @ResponseBody
-    public Claims checkToken(@RequestParam("token") String value) {
+    public Claims checkToken(@RequestParam("token") String value, @RequestParam(name = "scopes", required = false, defaultValue = "") List<String> scopes) {
 
         OAuth2AccessToken token = resourceServerTokenServices.readAccessToken(value);
         if (token == null) {
@@ -76,21 +80,33 @@ public class CheckTokenEndpoint implements InitializingBean {
             throw new InvalidTokenException((x.getMessage()));
         }
 
+        Claims response = getClaimsForToken(token.getValue());
 
-        Claims response = getClaimsForToken(value);
+        List<String> claimScopes = response.getScope().stream().map(String::toLowerCase).collect(Collectors.toList());
+
+        List<String> missingScopes = new ArrayList<>();
+        for(String expectedScope : scopes) {
+            if (!claimScopes.contains(expectedScope.toLowerCase())) {
+                missingScopes.add(expectedScope);
+            }
+        }
+
+        if (!missingScopes.isEmpty()) {
+            throw new InvalidScopeException("Some requested scopes are missing: " + String.join(",", missingScopes));
+        }
 
         return response;
     }
 
     private Claims getClaimsForToken(String token) {
-        Jwt tokenJwt = null;
+        Jwt tokenJwt;
         try {
             tokenJwt = JwtHelper.decode(token);
         } catch (Throwable t) {
             throw new InvalidTokenException("Invalid token (could not decode): " + token);
         }
 
-        Claims claims = null;
+        Claims claims;
         try {
             claims = JsonUtils.readValue(tokenJwt.getClaims(), Claims.class);
         } catch (JsonUtils.JsonUtilException e) {
@@ -115,6 +131,12 @@ public class CheckTokenEndpoint implements InitializingBean {
             }
         };
         return exceptionTranslator.translate(e400);
+    }
+
+    @ExceptionHandler(InvalidScopeException.class)
+    public ResponseEntity<OAuth2Exception> handleInvalidScopeException(Exception e) throws Exception {
+        logger.info("Handling error: " + e.getClass().getSimpleName() + ", " + e.getMessage());
+        return exceptionTranslator.translate(e);
     }
 
 }

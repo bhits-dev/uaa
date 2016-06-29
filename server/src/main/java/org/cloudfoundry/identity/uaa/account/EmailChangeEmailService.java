@@ -12,14 +12,6 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.account;
 
-import java.sql.Timestamp;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Pattern;
-
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.cloudfoundry.identity.uaa.codestore.ExpiringCode;
 import org.cloudfoundry.identity.uaa.codestore.ExpiringCodeStore;
@@ -30,7 +22,6 @@ import org.cloudfoundry.identity.uaa.message.MessageType;
 import org.cloudfoundry.identity.uaa.scim.ScimUser;
 import org.cloudfoundry.identity.uaa.scim.ScimUserProvisioning;
 import org.cloudfoundry.identity.uaa.util.JsonUtils;
-import org.cloudfoundry.identity.uaa.util.UaaStringUtils;
 import org.cloudfoundry.identity.uaa.util.UaaUrlUtils;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
@@ -41,6 +32,16 @@ import org.springframework.util.StringUtils;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import java.sql.Timestamp;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static org.cloudfoundry.identity.uaa.codestore.ExpiringCodeType.EMAIL;
+import static org.cloudfoundry.identity.uaa.util.UaaUrlUtils.findMatchingRedirectUri;
+
 public class EmailChangeEmailService implements ChangeEmailService {
 
     private final TemplateEngine templateEngine;
@@ -50,14 +51,12 @@ public class EmailChangeEmailService implements ChangeEmailService {
     private final ClientDetailsService clientDetailsService;
     private static final int EMAIL_CHANGE_LIFETIME = 30 * 60 * 1000;
     public static final String CHANGE_EMAIL_REDIRECT_URL = "change_email_redirect_url";
-    private final UaaUrlUtils uaaUrlUtils;
     private final String companyName;
 
-    public EmailChangeEmailService(TemplateEngine templateEngine, MessageService messageService, ScimUserProvisioning scimUserProvisioning, UaaUrlUtils uaaUrlUtils, String companyName, ExpiringCodeStore codeStore, ClientDetailsService clientDetailsService) {
+    public EmailChangeEmailService(TemplateEngine templateEngine, MessageService messageService, ScimUserProvisioning scimUserProvisioning, String companyName, ExpiringCodeStore codeStore, ClientDetailsService clientDetailsService) {
         this.templateEngine = templateEngine;
         this.messageService = messageService;
         this.scimUserProvisioning = scimUserProvisioning;
-        this.uaaUrlUtils = uaaUrlUtils;
         this.companyName = companyName;
         this.codeStore = codeStore;
         this.clientDetailsService = clientDetailsService;
@@ -90,13 +89,13 @@ public class EmailChangeEmailService implements ChangeEmailService {
         codeData.put("redirect_uri", redirectUri);
         codeData.put("email", newEmail);
 
-        return codeStore.generateCode(JsonUtils.writeValueAsString(codeData), new Timestamp(System.currentTimeMillis() + EMAIL_CHANGE_LIFETIME), null).getCode();
+        return codeStore.generateCode(JsonUtils.writeValueAsString(codeData), new Timestamp(System.currentTimeMillis() + EMAIL_CHANGE_LIFETIME), EMAIL.name()).getCode();
     }
 
     @Override
     public Map<String, String> completeVerification(String code) {
         ExpiringCode expiringCode = codeStore.retrieveCode(code);
-        if (expiringCode == null) {
+        if ((null == expiringCode) || ((null != expiringCode.getIntent()) && !EMAIL.name().equals(expiringCode.getIntent()))) {
             throw new UaaException("Error", 400);
         }
 
@@ -121,14 +120,9 @@ public class EmailChangeEmailService implements ChangeEmailService {
                 ClientDetails clientDetails = clientDetailsService.loadClientByClientId(clientId);
                 Set<String> redirectUris = clientDetails.getRegisteredRedirectUri() == null ? Collections.emptySet() :
                         clientDetails.getRegisteredRedirectUri();
-                Set<Pattern> wildcards = UaaStringUtils.constructWildcards(redirectUris);
-                if (UaaStringUtils.matches(wildcards, redirectUri)) {
-                    redirectLocation = redirectUri;
-                } else {
-                     redirectLocation = (String) clientDetails.getAdditionalInformation().get(CHANGE_EMAIL_REDIRECT_URL);
-                }
-            } catch (NoSuchClientException e) {
-            }
+                String changeEmailRedirectUrl = (String) clientDetails.getAdditionalInformation().get(CHANGE_EMAIL_REDIRECT_URL);
+                redirectLocation = findMatchingRedirectUri(redirectUris, redirectUri, changeEmailRedirectUrl);
+            } catch (NoSuchClientException nsce) {}
         }
 
         Map<String,String> result = new HashMap<>();
@@ -149,7 +143,7 @@ public class EmailChangeEmailService implements ChangeEmailService {
     }
 
     private String getEmailChangeEmailHtml(String email, String newEmail, String code) {
-        String verifyUrl = uaaUrlUtils.getUaaUrl("/verify_email");
+        String verifyUrl = UaaUrlUtils.getUaaUrl("/verify_email");
 
         final Context ctx = new Context();
         if (IdentityZoneHolder.get().equals(IdentityZone.getUaa())) {

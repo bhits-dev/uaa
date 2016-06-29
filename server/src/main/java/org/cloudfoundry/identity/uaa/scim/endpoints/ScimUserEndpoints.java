@@ -12,19 +12,36 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.scim.endpoints;
 
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.cloudfoundry.identity.uaa.codestore.ExpiringCode;
-import org.cloudfoundry.identity.uaa.codestore.ExpiringCodeStore;
-import org.cloudfoundry.identity.uaa.web.ConvertingExceptionView;
-import org.cloudfoundry.identity.uaa.web.ExceptionReport;
 import org.cloudfoundry.identity.uaa.approval.Approval;
 import org.cloudfoundry.identity.uaa.approval.ApprovalStore;
+import org.cloudfoundry.identity.uaa.codestore.ExpiringCode;
+import org.cloudfoundry.identity.uaa.codestore.ExpiringCodeStore;
+import org.cloudfoundry.identity.uaa.constants.OriginKeys;
 import org.cloudfoundry.identity.uaa.resources.AttributeNameMapper;
 import org.cloudfoundry.identity.uaa.resources.ResourceMonitor;
 import org.cloudfoundry.identity.uaa.resources.SearchResults;
 import org.cloudfoundry.identity.uaa.resources.SearchResultsFactory;
 import org.cloudfoundry.identity.uaa.resources.SimpleAttributeNameMapper;
+import org.cloudfoundry.identity.uaa.scim.DisableInternalUserManagementFilter;
+import org.cloudfoundry.identity.uaa.scim.DisableUserManagementSecurityFilter;
+import org.cloudfoundry.identity.uaa.scim.InternalUserManagementDisabledException;
 import org.cloudfoundry.identity.uaa.scim.ScimCore;
 import org.cloudfoundry.identity.uaa.scim.ScimGroup;
 import org.cloudfoundry.identity.uaa.scim.ScimGroupMembershipManager;
@@ -37,6 +54,8 @@ import org.cloudfoundry.identity.uaa.scim.util.ScimUtils;
 import org.cloudfoundry.identity.uaa.scim.validate.PasswordValidator;
 import org.cloudfoundry.identity.uaa.util.UaaPagingUtils;
 import org.cloudfoundry.identity.uaa.util.UaaStringUtils;
+import org.cloudfoundry.identity.uaa.web.ConvertingExceptionView;
+import org.cloudfoundry.identity.uaa.web.ExceptionReport;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.expression.spel.SpelEvaluationException;
@@ -80,6 +99,9 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.cloudfoundry.identity.uaa.codestore.ExpiringCodeType.REGISTRATION;
+import static org.springframework.util.StringUtils.isEmpty;
 
 /**
  * User provisioning and query endpoints. Implements the core API from the
@@ -125,6 +147,16 @@ public class ScimUserEndpoints implements InitializingBean {
     private PasswordValidator passwordValidator;
 
     private ExpiringCodeStore codeStore;
+
+    public void checkIsEditAllowed(String origin, HttpServletRequest request) {
+        Object attr = request.getAttribute(DisableInternalUserManagementFilter.DISABLE_INTERNAL_USER_MANAGEMENT);
+        if (attr!=null && attr instanceof Boolean) {
+            boolean isUserManagementDisabled = (boolean)attr;
+            if (isUserManagementDisabled && (OriginKeys.UAA.equals(origin) || isEmpty(origin))) {
+                throw new InternalUserManagementDisabledException(DisableUserManagementSecurityFilter.INTERNAL_USER_CREATION_IS_CURRENTLY_DISABLED);
+            }
+        }
+    }
 
     /**
      * Set the message body converters to use.
@@ -173,16 +205,17 @@ public class ScimUserEndpoints implements InitializingBean {
 
     @RequestMapping(value = "/Users/{userId}", method = RequestMethod.GET)
     @ResponseBody
-    public ScimUser getUser(@PathVariable String userId, HttpServletResponse httpServletResponse) {
+    public ScimUser getUser(@PathVariable String userId, HttpServletResponse response) {
         ScimUser scimUser = syncApprovals(syncGroups(dao.retrieve(userId)));
-        addETagHeader(httpServletResponse, scimUser);
+        addETagHeader(response, scimUser);
         return scimUser;
     }
 
     @RequestMapping(value = "/Users", method = RequestMethod.POST)
     @ResponseStatus(HttpStatus.CREATED)
     @ResponseBody
-    public ScimUser createUser(@RequestBody ScimUser user, HttpServletResponse httpServletResponse) {
+    public ScimUser createUser(@RequestBody ScimUser user, HttpServletRequest request, HttpServletResponse response) {
+        checkIsEditAllowed(user.getOrigin(), request);
         if (user.getPassword() == null) {
             user.setPassword(generatePassword());
         } else {
@@ -197,15 +230,17 @@ public class ScimUserEndpoints implements InitializingBean {
             }
         }
         scimUser = syncApprovals(syncGroups(scimUser));
-        addETagHeader(httpServletResponse, scimUser);
+        addETagHeader(response, scimUser);
         return scimUser;
     }
 
     @RequestMapping(value = "/Users/{userId}", method = RequestMethod.PUT)
     @ResponseBody
     public ScimUser updateUser(@RequestBody ScimUser user, @PathVariable String userId,
-                    @RequestHeader(value = "If-Match", required = false, defaultValue = "NaN") String etag,
+                               @RequestHeader(value = "If-Match", required = false, defaultValue = "NaN") String etag,
+                               HttpServletRequest request,
                     HttpServletResponse httpServletResponse) {
+        checkIsEditAllowed(user.getOrigin(), request);
         if (etag.equals("NaN")) {
             throw new ScimException("Missing If-Match for PUT", HttpStatus.BAD_REQUEST);
         }
@@ -225,10 +260,12 @@ public class ScimUserEndpoints implements InitializingBean {
     @RequestMapping(value = "/Users/{userId}", method = RequestMethod.DELETE)
     @ResponseBody
     public ScimUser deleteUser(@PathVariable String userId,
-                    @RequestHeader(value = "If-Match", required = false) String etag,
-                    HttpServletResponse httpServletResponse) {
+                               @RequestHeader(value = "If-Match", required = false) String etag,
+                               HttpServletRequest request,
+                               HttpServletResponse httpServletResponse) {
         int version = etag == null ? -1 : getVersion(userId, etag);
         ScimUser user = getUser(userId, httpServletResponse);
+        checkIsEditAllowed(user.getOrigin(), request);
         membershipManager.removeMembersByMemberId(userId);
         dao.delete(userId, version);
         scimDeletes.incrementAndGet();
@@ -257,7 +294,7 @@ public class ScimUserEndpoints implements InitializingBean {
             throw new UserAlreadyVerifiedException();
         }
 
-        ExpiringCode expiringCode = ScimUtils.getExpiringCode(codeStore, userId, user.getPrimaryEmail(), clientId, redirectUri);
+        ExpiringCode expiringCode = ScimUtils.getExpiringCode(codeStore, userId, user.getPrimaryEmail(), clientId, redirectUri, REGISTRATION);
         responseBody.setVerifyLink(ScimUtils.getVerificationURL(expiringCode));
 
         return new ResponseEntity<>(responseBody, HttpStatus.OK);
@@ -322,7 +359,11 @@ public class ScimUserEndpoints implements InitializingBean {
                 input.add(user);
             }
         } catch (IllegalArgumentException e) {
-            throw new ScimException("Invalid filter expression: [" + filter + "]", HttpStatus.BAD_REQUEST);
+            String msg = "Invalid filter expression: [" + filter + "]";
+            if (StringUtils.hasText(sortBy)) {
+                msg += " [" +sortBy+"]";
+            }
+            throw new ScimException(msg, HttpStatus.BAD_REQUEST);
         }
 
         if (!StringUtils.hasLength(attributesCommaSeparated)) {
@@ -380,7 +421,10 @@ public class ScimUserEndpoints implements InitializingBean {
     }
 
     @ExceptionHandler
-    public View handleException(Exception t, HttpServletRequest request) throws ScimException {
+    public View handleException(Exception t, HttpServletRequest request) throws ScimException, InternalUserManagementDisabledException {
+        if (t instanceof InternalUserManagementDisabledException) {
+            throw (InternalUserManagementDisabledException)t;
+        }
         logger.error("Unhandled exception in SCIM user endpoints.",t);
         ScimException e = new ScimException("Unexpected error", t, HttpStatus.INTERNAL_SERVER_ERROR);
         if (t instanceof ScimException) {
