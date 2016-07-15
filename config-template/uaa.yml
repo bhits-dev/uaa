@@ -38,7 +38,7 @@ oauth:
     admin-portal-ui:
       authorized-grant-types: password
       secret: changeit
-      scope: openid,scim.write,scim.read,scim.create,phr.allPatientProfiles_read,phr.hie_write,phr.allPatients_read,phr.patient_read,registration.write,uaa.admin,patientUser.read,patientUser.write,adminUI.access
+      scope: openid,scim.write,scim.read,scim.create,phr.allPatientProfiles_read,phr.hie_write,phr.allPatients_read,phr.patient_read,registration.write,uaa.admin,patientUser.read,patientUser.write,adminUI.access,pep.patient_read
       authorities: uaa.resource
     patient-user:
       secret: changeit
@@ -72,6 +72,8 @@ scim:
     pep.patient_read: Access policy enforcement point
   users:
     - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.allPatientProfiles_read,phr.hie_write,phr.allPatients_read,phr.patient_read,registration.write,uaa.admin,patientUser.read,patientUser.write,adminUI.access
+    - pgchd@gmail.com|admin|pgchd@gmail.com|Prince George’s County Health Department| |openid,phr.allPatients_read,phr.patient_read,adminUI.access,pep.patient_read
+    - nancy.nightingale@gmail.com|admin|nancy.nightingale@gmail.com|Nancy|Nightingale|openid,phr.allPatients_read,phr.patient_read,adminUI.access,pep.patient_read
 c2s:
   uaa:
     host: https://localhost:8443/uaa
