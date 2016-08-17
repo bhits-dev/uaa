@@ -55,6 +55,11 @@ oauth:
       authorized-grant-types: client_credentials
       scope: uaa.none
       authorities: pep.patient_read
+    sysadmin:
+      secret: changeit
+      authorized-grant-types: client_credentials
+      scope: uaa.none
+      authorities: patientUser.scope_assign
 scim:
   groups:
     phr.hie_read: Access your health information
