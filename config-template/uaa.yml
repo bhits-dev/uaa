@@ -64,7 +64,7 @@ oauth:
       secret: changeit
       authorized-grant-types: client_credentials
       scope: uaa.none
-      authorities: patientUser.scope_assign
+      authorities: uaa.admin,clients.read,clients.write,clients.secret,scim.read,scim.write,clients.admin,patientUser.scope_assign
 scim:
   groups:
     phr.hie_read: Access your health information
