@@ -89,6 +89,7 @@ scim:
     ppUI.access: Access patient portal UI
     pep.patient_read: Access policy enforcement point
     tryPolicy.clinicalDocument_read: View policies applied on clinical document
+    patientUser.scope_assign: Allows Sysadmin to assign scopes to users
   users:
     - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.allPatientProfiles_read,phr.hie_write,phr.allPatients_read,phr.patient_read,registration.write,uaa.admin,patientUser.read,patientUser.write,adminUI.access
     - pgchd@gmail.com|admin|pgchd@gmail.com|Prince George’s County Health Department| |openid,phr.allPatients_read,phr.patient_read,adminUI.access,pep.patient_read
