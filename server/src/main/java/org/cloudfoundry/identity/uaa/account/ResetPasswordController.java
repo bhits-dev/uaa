@@ -114,7 +114,7 @@ public class ResetPasswordController {
         try {
             ForgotPasswordInfo forgotPasswordInfo = resetPasswordService.forgotPassword(email, clientId, redirectUri);
             userId = forgotPasswordInfo.getUserId();
-            htmlContent = getCodeSentEmailHtml(forgotPasswordInfo.getResetPasswordCode().getCode());
+            htmlContent = getCodeSentEmailHtml(forgotPasswordInfo.getResetPasswordCode().getCode(), email);
         } catch (ConflictException e) {
             htmlContent = getResetUnavailableEmailHtml(email);
             userId = e.getUserId();
@@ -136,7 +136,7 @@ public class ResetPasswordController {
         return serviceName + " account password reset request";
     }
 
-    private String getCodeSentEmailHtml(String code) {
+    private String getCodeSentEmailHtml(String code, String email) {
         //String resetUrl = UaaUrlUtils.getUaaUrl("/reset_password");
         //TODO: uaa under edge server and based on configurations in edge server resetUrl will address to invalid reset page
         String resetUrl = c2sUaaHost + "/reset_password";
@@ -145,6 +145,7 @@ public class ResetPasswordController {
         ctx.setVariable("serviceName", getServiceName());
         ctx.setVariable("code", code);
         ctx.setVariable("resetUrl", resetUrl);
+        ctx.setVariable("email", email);
         return templateEngine.process("reset_password", ctx);
     }
 
