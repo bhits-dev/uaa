@@ -30,7 +30,7 @@ database:
   driverClassName: org.mariadb.jdbc.Driver # only if spring_profiles=mysql
   url: jdbc:mysql://localhost:3306/uaa # only if spring_profiles=mysql
   username: root # only if spring_profiles=mysql
-  password: admin # only if spring_profiles=mysql
+  password: ${UAA_DB_PASSWORD:admin} # only if spring_profiles=mysql
 oauth:
   clients:
     admin:
