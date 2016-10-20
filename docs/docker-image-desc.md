@@ -75,7 +75,7 @@ View [license]() information for the software contained in this image.
 
 ## Documentation 
 
-Documentation for this image is stored in the [bhits/phr-api](https://github.com/bhits/uaa) GitHub repository. Be sure to familiarize yourself with the repository's README.md file before attempting a pull request.
+Documentation for this image is stored in the [bhits/uaa](https://github.com/bhits/uaa) GitHub repository. Be sure to familiarize yourself with the repository's README.md file before attempting a pull request.
 
 ## Issues
 
