@@ -91,10 +91,10 @@ scim:
     tryPolicy.clinicalDocument_read: View policies applied on clinical document
     patientUser.scope_assign: Allows Sysadmin to assign scopes to users
   users:
+#  Configure additional providers(users) as:
+#    - EmailId | password | EmailId | FirstName | LastName | <Comma saperated list of permissions>
+#  For example:  - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.allPatientProfiles_read,phr.hie_write,phr.allPatients_read,phr.patient_read,registration.write,uaa.admin,patientUser.read,patientUser.write,adminUI.access
     - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.allPatientProfiles_read,phr.hie_write,phr.allPatients_read,phr.patient_read,registration.write,uaa.admin,patientUser.read,patientUser.write,adminUI.access
-    - pgchd@gmail.com|admin|pgchd@gmail.com|Prince George’s County Health Department| |openid,phr.allPatients_read,phr.patient_read,adminUI.access,pep.patient_read
-    - nancy.nightingale@gmail.com|admin|nancy.nightingale@gmail.com|Nancy|Nightingale|openid,phr.allPatients_read,phr.patient_read,adminUI.access,pep.patient_read
-    - peter.kim@gmail.com|admin|peter.kim@gmail.com|Peter|Kim|openid,phr.allPatients_read,phr.patient_read,adminUI.access,pep.patient_read
 c2s:
   uaa:
     host: https://localhost:8443/uaa
