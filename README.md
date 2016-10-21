@@ -483,3 +483,20 @@ Here are some ways for you to get involved in the community:
 
 * Change the style/CSS of "Consent2Share account password reset request" email to match with "Set up your Consent2Share account" email.
 * Fix a bug that prevented the user's email ID from being printed in the "Consent2Share account password reset request" email body.
+* Added uaa.yml under config-template for configuring the uaa properties
+* Created docker folder and added Dockerfile to dockerize uaa
+* Added docker-image-desc.md under docs folder which describes about uaa docker image
+
+## Configure
+* By default C2S staff admin user (consent2share@gmail.com/admin) will be created which can be changed or more staff admin users can be
+  added under scim.users section in uaa.yml.
+* Add the following environment variables.
+    - UAA_CONFIG_PATH=your-workspace/uaa/config-template/uaa.yml
+    - UAA_SMTP_HOST= your_mail_host
+    - UAA_SMTP_PORT= your_mail_port
+    - UAA_SMTP_USER= your_mail_user
+    - UAA_SMTP_PASSWORD=your_mail_pwd
+    - C2S_DB_HOST=your_db_host
+    - UAA_DB_PASSWORD=your_db_pwd
+    - C2S_APP_HOST=your_app_host(localhost/dockerhost/IP)
+    - C2S_APP_PORT=your_app_port(80)
