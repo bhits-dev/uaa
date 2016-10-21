@@ -481,5 +481,5 @@ Here are some ways for you to get involved in the community:
 
 ## Changes made by BHITS Team
 
-* Change the style/CSS of RESET PASSWORD email to match with CREATE NEW Account email.
-* Fix a bug that prevented the user's email ID from being printed in the RESET PASSWORD email body.
+* Change the style/CSS of "Consent2Share account password reset request" email to match with "Set up your Consent2Share account" email.
+* Fix a bug that prevented the user's email ID from being printed in the "Consent2Share account password reset request" email body.
