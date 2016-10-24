@@ -60,7 +60,7 @@ In the steps above, replace:
 * `<domain>` this is your app domain. We will be parsing this from the system environment in the future
 * You may also provide a configuration manifest where the environment variable UAA_CONFIG_YAML contains full configuration yaml.
 
-### Demo of command line usage on local server
+### Demo of Command Line Usage on Local Server
 
 First run the UAA server as described above:
 
@@ -112,7 +112,7 @@ token grant on stdout, e.g.
       user_id: ba14fea0-9d87-4f0c-b59e-32aaa8eb1434
       client_id: cf
 
-### Running local system against default MySQL and PostgreSQL settings (and Flyway migration script information)
+### Running Local System Against Default MySQL and PostgreSQL Settings (and Flyway Migration Script Information)
 
     $ ./gradlew -Dspring.profiles.active=default,mysql run
 
@@ -147,7 +147,7 @@ as part of your command line. This disables the flywayClean task in the gradle s
 Another way to disable to the flywayClean is to not specify the spring profiles on the command line,
 but set the profiles in the uaa.yml and login.yml files.
 
-### Demo of command line usage on run.pivotal.io
+### Demo of Command Line Usage on run.pivotal.io
 
 The same command line example should work against a UAA running on
 run.pivotal.io (except for the token decoding bit because you won't
@@ -173,7 +173,7 @@ You can then try logging in with the UAA ruby gem.  Make sure you have ruby 1.9,
 This authenticates and obtains an access token from the server using the OAuth2 implicit
 grant, the same as used by a client like CF.
 
-## Integration tests
+## Integration Tests
 
 You can run the integration tests with
 
@@ -259,7 +259,7 @@ Notice how uaa.url can be converted into an environment variable called UAA_URL
               host: mail.server.host
               port: 3535
 
-### Using Gradle to test with postgresql or mysql
+### Using Gradle to Test with postgresql or mysql
 
 The default uaa unit tests (./gradlew test integrationTest) use hsqldb.
 
@@ -455,7 +455,7 @@ Here are some ways for you to get involved in the community:
   Please help out on the
   [mailing list](https://lists.cloudfoundry.org)
   by responding to questions and joining the debate.
-* Create [github](https://github.com/cloudfoundry/uaa/issues) tickets for bugs and new features and comment and
+* Create [Github](https://github.com/cloudfoundry/uaa/issues) tickets for bugs and new features and comment and
   vote on the ones that you are interested in.
 * Github is for social coding: if you want to write code, we encourage
   contributions through pull requests from
@@ -479,7 +479,23 @@ Here are some ways for you to get involved in the community:
   innovative and intelligent tools for profiling Java and .NET applications.
   [![](https://www.yourkit.com/images/yklogo.png)](https://www.yourkit.com/java/profiler/index.jsp)
 
-## Changes made by BHITS Team
+## Changes Made by the Consent2Share Development Team
 
-* Change the style/CSS of RESET PASSWORD email to match with CREATE NEW Account email.
-* Fix a bug that prevented the user's email ID from being printed in the RESET PASSWORD email body.
+* Change the style/CSS of "Consent2Share account password reset request" email to match with "Set up your Consent2Share account" email.
+* Fix a bug that prevented the user's email ID from being printed in the "Consent2Share account password reset request" email body.
+* Added uaa.yml under config-template for configuring the uaa properties
+* Created a Docker folder and added Dockerfile to dockerize uaa
+* Added docker-image-desc.md under docs folder which describes about uaa Docker image
+
+## Configure
+* By default a Consent2Share staff admin user (consent2share@gmail.com/admin) will be created, which can be changed or more staff admin users can be added under scim.users section in uaa.yml.
+* Add the following environment variables:
+    - UAA_CONFIG_PATH=your-workspace/uaa/config-template/uaa.yml
+    - UAA_SMTP_HOST= your_mail_host
+    - UAA_SMTP_PORT= your_mail_port
+    - UAA_SMTP_USER= your_mail_user
+    - UAA_SMTP_PASSWORD=your_mail_pwd
+    - C2S_DB_HOST=your_db_host
+    - UAA_DB_PASSWORD=your_db_pwd
+    - C2S_APP_HOST=your_app_host(localhost/dockerhost/IP)
+    - C2S_APP_PORT=your_app_port(80)
