@@ -481,11 +481,11 @@ Here are some ways for you to get involved in the community:
 
 ## Changes Made by the Consent2Share Development Team
 
-* Change the style/CSS of "Consent2Share account password reset request" email to match with "Set up your Consent2Share account" email.
-* Fix a bug that prevented the user's email ID from being printed in the "Consent2Share account password reset request" email body.
-* Added uaa.yml under config-template for configuring the uaa properties
-* Created a Docker folder and added Dockerfile to dockerize uaa
-* Added docker-image-desc.md under docs folder which describes about uaa Docker image
+* Change the style/CSS of "Consent2Share account password reset request" email to match with "Set up your Consent2Share account" email
+* Fix a bug that prevented the user's email ID from being printed in the "Consent2Share account password reset request" email body
+* Added uaa.yml under config-template for configuring the UAA properties
+* Created a Docker folder and added Dockerfile to dockerize UAA
+* Added docker-image-desc.md in uaa\docs folder which describes UAA Docker image
 
 ## Configure
 * By default a Consent2Share staff admin user (consent2share@gmail.com/admin) will be created, which can be changed or more staff admin users can be added under scim.users section in uaa.yml.
