@@ -40,7 +40,7 @@ oauth:
       secret: adminsecret
       authorized-grant-types: client_credentials
       scope: uaa.none
-      authorities: uaa.admin,clients.read,clients.write,clients.secret,scim.read,scim.write,clients.admin,pcm.management,pep.management,phr.management,registration.management,tryPolicy.management
+      authorities: uaa.admin,clients.read,clients.write,clients.secret,scim.read,scim.write,clients.admin,patientUser.management,pcm.management,pep.management,phr.management,registration.management,tryPolicy.management
     cf: # this client is needed for cf cli and uaac cli to act on user's behalf
       authorized-grant-types: implicit,password,refresh_token
       scope: uaa.user,cloud_controller.read,cloud_controller.write,openid,password.write,scim.userids,cloud_controller.admin,scim.read,scim.write
