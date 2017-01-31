@@ -5,11 +5,9 @@ CloudFoundry User Account and Authentication (UAA) is used as OAuth2 server in C
 
 # Supported Source Code Tags and Current `Dockerfile` Link
 
-[`3.4.1-01`](https://github.com/bhits/uaa/releases/tag/3.4.1-01), [`3.4.1-02`](https://github.com/bhits/uaa/releases/tag/3.4.1-02), [`latest`](https://github.com/bhits/uaa/releases/tag/3.4.1-02)
+[`3.4.1-01`](https://github.com/bhits/uaa/releases/tag/3.4.1-01), [`3.4.1-02 (latest)`](https://github.com/bhits/uaa/releases/tag/3.4.1-02)
 
 [`Current Dockerfile`](https://github.com/bhits/uaa/blob/master/docker/Dockerfile)
-
-For more information about this image, the source code, and its history, please see the [GitHub repository](https://github.com/bhits/uaa).
 
 For more information about this image, the source code, and its history, please see the [GitHub repository](https://github.com/bhits/uaa).
 
