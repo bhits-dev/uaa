@@ -26,7 +26,7 @@ Be sure to familiarize yourself with the repository's [README.md](https://github
 
 `docker run  --name uaa <configuration> -d bhits/uaa:latest`
 
-*NOTE: In order for this API to fully function as a microservice in the Consent2Share application, it is required to setup the dependency microservices and support level infrastructure. Please refer to the [Consent2Share Deployment Guide]() for instructions to setup the Consent2Share infrastructure.*
+*NOTE: In order for this API to fully function as a microservice in the Consent2Share application, it is required to setup the dependency microservices and support level infrastructure. Please refer to the Consent2Share Deployment Guide in the corresponding Consent2Share release ([Consent2Share Releases](https://github.com/bhits/consent2share/releases)) for instructions to setup the Consent2Share infrastructure.*
 
 
 ## Configure
