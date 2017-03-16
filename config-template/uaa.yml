@@ -39,7 +39,7 @@ oauth:
     c2s-ui:
       authorized-grant-types: password
       secret: changeit
-      scope: openid,c2s-ui.access,c2s-ui-api.read
+      scope: openid,c2sUi.access,c2sUiApi.read
       authorities: uaa.resource
 scim:
   groups:
@@ -49,7 +49,7 @@ scim:
 #  Configure additional c2s staff admin(users) as:
 #    - EmailId | password | EmailId | FirstName | LastName | <Comma saperated list of permissions>
 #  For example:  - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.allPatientProfiles_read,phr.hie_write,phr.allPatients_read,phr.patient_read,registration.write,uaa.admin,patientUser.read,patientUser.write,adminUI.access
-    - sallyshare@mailinator.com|AAA#aaa1|sallyshare@mailinator.com|sally|share|c2s-ui.access,c2s-ui-api.read
+    - sallyshare@mailinator.com|AAA#aaa1|sallyshare@mailinator.com|sally|share|c2sUi.access,c2sUiApi.read
 # C2S_APP_HOST and C2S_APP_PORT are related to edge server api
 c2s:
   uaa:
