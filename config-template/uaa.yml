@@ -43,13 +43,13 @@ oauth:
       authorities: uaa.resource
 scim:
   groups:
-    c2s-ui.access: Access C2S UI
-    pls.read: Access provider lookup service
+    c2sUiApi.read: Read access to C2S Backend API
+    c2sUiApi.write: Write access to C2S Backend API
   users:
 #  Configure additional c2s staff admin(users) as:
 #    - EmailId | password | EmailId | FirstName | LastName | <Comma saperated list of permissions>
-#  For example:  - consent2share@gmail.com|admin|consent2share@gmail.com|admin|admin|openid,scim.write,scim.read,scim.create,phr.allPatientProfiles_read,phr.hie_write,phr.allPatients_read,phr.patient_read,registration.write,uaa.admin,patientUser.read,patientUser.write,adminUI.access
-    - sallyshare@mailinator.com|AAA#aaa1|sallyshare@mailinator.com|sally|share|c2sUi.access,c2sUiApi.read,c2sUiApi.write
+#  For example:  - sallyshare@mailinator.com|AAA#aaa1|sallyshare@mailinator.com|sally|share|c2sUiApi.read,c2sUiApi.write
+    - sallyshare@mailinator.com|AAA#aaa1|sallyshare@mailinator.com|sally|share|c2sUiApi.read,c2sUiApi.write
 # C2S_APP_HOST and C2S_APP_PORT are related to edge server api
 c2s:
   uaa:
