@@ -5,7 +5,7 @@ CloudFoundry User Account and Authentication (UAA) is used as OAuth2 server in C
 
 # Supported Source Code Tags and Current `Dockerfile` Link
 
-[`3.4.1-02 (latest)`](https://github.com/bhits/uaa/releases/tag/3.4.1-02), [`3.4.1-01`](https://github.com/bhits/uaa/releases/tag/3.4.1-01)
+[`3.4.1-04 (latest)`](https://github.com/bhits/uaa/releases/tag/3.4.1-04)
 
 [`Current Dockerfile`](https://github.com/bhits/uaa/blob/master/docker/Dockerfile)
 
@@ -68,7 +68,7 @@ These environment variables are related to edge server host and port and are use
 
 # Supported Docker versions
 
-This image is officially supported on Docker version 1.12.1.
+This image is officially supported on Docker version 1.13.0.
 
 Support for older versions (down to 1.6) is provided on a best-effort basis.
 

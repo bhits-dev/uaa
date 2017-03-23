@@ -488,7 +488,7 @@ Here are some ways for you to get involved in the community:
 * Added docker-image-desc.md in uaa\docs folder which describes UAA Docker image
 
 ## Configure
-* By default a Consent2Share staff admin user (consent2share@gmail.com/admin) will be created, which can be changed or more staff admin users can be added under scim.users section in uaa.yml.
+* By default a Consent2Share patient user (sallyshare@mailinator.com/AAA#aaa1) will be created.
 * Add the following environment variables:
     - UAA_CONFIG_PATH=your-workspace/uaa/config-template/uaa.yml
     - UAA_SMTP_HOST= your_mail_host
