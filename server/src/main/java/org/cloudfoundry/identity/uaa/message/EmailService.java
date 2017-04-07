@@ -23,7 +23,6 @@ public class EmailService implements MessageService {
     private JavaMailSender mailSender;
     private final String loginUrl;
     private final String companyName;
-    private JavaMailSender mailSender;
 
     @Value("${smtp.fromAddress}")
     private String fromAddress;
