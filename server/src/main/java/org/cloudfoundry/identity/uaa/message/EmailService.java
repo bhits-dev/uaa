@@ -4,6 +4,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.util.StringUtils;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -22,6 +23,10 @@ public class EmailService implements MessageService {
     private JavaMailSender mailSender;
     private final String loginUrl;
     private final String companyName;
+    private JavaMailSender mailSender;
+
+    @Value("${smtp.fromAddress}")
+    private String fromAddress;
 
     public EmailService(JavaMailSender mailSender, String loginUrl, String companyName) {
         this.mailSender = mailSender;
@@ -45,7 +50,9 @@ public class EmailService implements MessageService {
         } else {
             name = IdentityZoneHolder.get().getName();
         }
-        return new Address[]{new InternetAddress("admin@" + host, name)};
+        //TODO: Remove hard-coded fromAddress when upgrade to latest version
+        // return new Address[]{new InternetAddress("admin@" + host, name)};
+        return new Address[]{new InternetAddress(fromAddress, name)};
     }
 
     @Override
