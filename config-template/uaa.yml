@@ -19,6 +19,7 @@ smtp:
   port: ${UAA_SMTP_PORT}
   user: ${UAA_SMTP_USER}
   password: ${UAA_SMTP_PASSWORD}
+  fromAddress: noreply@consent2share.com
   javaMailProperties:
     mail:
       smtp:
