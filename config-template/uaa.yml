@@ -42,6 +42,11 @@ oauth:
       secret: changeit
       scope: openid,c2sUi.access,c2sUiApi.read,c2sUiApi.write
       authorities: uaa.resource
+    ums:
+      secret: changeit
+      authorized-grant-types: client_credentials
+      scope: uaa.none
+      authorities: scim.write,scim.read,scim.create,uaa.admin
 scim:
   groups:
     c2sUiApi.read: Read access to C2S Backend API
