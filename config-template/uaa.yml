@@ -47,6 +47,11 @@ oauth:
       secret: changeit
       scope: openid,staffUi.read
       authorities: uaa.resource
+    ums:
+      secret: changeit
+      authorized-grant-types: client_credentials
+      scope: uaa.none
+      authorities: scim.write,scim.read,scim.create,uaa.admin
 scim:
   groups:
     c2sUi.read: Access C2S UI
