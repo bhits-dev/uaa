@@ -57,6 +57,11 @@ oauth:
       authorized-grant-types: client_credentials
       scope: uaa.none
       authorities: scim.write,scim.read,scim.create,uaa.admin
+    pep-client:
+       secret: changeit
+       authorized-grant-types: client_credentials
+       scope: uaa.none
+       authorities: pepApi.read,pepApi.write          
 scim:
   groups:
     c2sUi.access: Access C2S UI
@@ -68,12 +73,14 @@ scim:
     providerUi.access: Access Provider UI
     providerUiApi.read: Read Provider UI backend resource
     providerUiApi.write: Write Provider UI backend resource
+    pepApi.read: Read PEP API backend resource
+    pepApi.write: Write PEP API backend resource
   users:
 #  Configure additional c2s staff admin(users) as:
 #    - EmailId | password | EmailId | FirstName | LastName | <Comma saperated list of permissions>
 #  For example:  - sallyshare@mailinator.com|AAA#aaa1|sallyshare@mailinator.com|sally|share|c2sUiApi.read,c2sUiApi.write
     - c2s-admin@mailinator.com|AAA#aaa1|c2s-admin@mailinator.com|admin|consent2share|staffUi.access,staffUiApi.read,staffUiApi.write
-    - c2s-provider@mailinator.com|AAA#aaa1|c2s-provider@mailinator.com|provider|consent2share|providerUi.access,providerUiApi.read,providerUiApi.write
+    - c2s-provider@mailinator.com|AAA#aaa1|c2s-provider@mailinator.com|provider|consent2share|providerUi.access,providerUiApi.read,providerUiApi.write,pepApi.read,pepApi.write
 # C2S_APP_HOST and C2S_APP_PORT are related to edge server api
 c2s:
   uaa:
