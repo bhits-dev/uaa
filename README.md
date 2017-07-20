@@ -488,8 +488,7 @@ Here are some ways for you to get involved in the community:
 * Added docker-image-desc.md in uaa\docs folder which describes UAA Docker image
 
 ## Configure
-* By default Consent2Share staff admin user (c2s-admin@mailinator.com/AAA#aaa1) and provider user
-(c2s-provider@mailinator.com/AAA#aaa1) will be created.
+* By default Consent2Share staff admin user (c2s-admin@mailinator.com/AAA#aaa1) will be created.
 * Add the following environment variables:
     - UAA_CONFIG_PATH=your-workspace/uaa/config-template/uaa.yml
     - UAA_SMTP_HOST= your_mail_host
